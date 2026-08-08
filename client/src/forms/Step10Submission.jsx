@@ -1,10 +1,66 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Download, Printer, Home, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { Download, Printer, Home, CheckCircle2, Loader2, ArrowRight, Sparkles } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import SuccessAnimation from '../components/SuccessAnimation';
 import { generateAcknowledgementPDF } from '../utils/pdfGenerator';
 
 const Step10Submission = ({ isSubmitting, submittedData, onSubmit, onReset }) => {
+  // Party Puff Blast sequence
+  const firePartyPuff = useCallback(() => {
+    // Stage 1: Central explosion pop
+    confetti({
+      particleCount: 90,
+      spread: 80,
+      origin: { y: 0.55 },
+      colors: ['#7c3aed', '#10b981', '#f59e0b', '#ec4899', '#3b82f6', '#ffd700'],
+      disableForReducedMotion: true
+    });
+
+    // Stage 2: Left party cannon burst
+    setTimeout(() => {
+      confetti({
+        particleCount: 65,
+        angle: 60,
+        spread: 60,
+        origin: { x: 0.05, y: 0.65 },
+        colors: ['#7c3aed', '#10b981', '#ffd700', '#3b82f6']
+      });
+    }, 200);
+
+    // Stage 3: Right party cannon burst
+    setTimeout(() => {
+      confetti({
+        particleCount: 65,
+        angle: 120,
+        spread: 60,
+        origin: { x: 0.95, y: 0.65 },
+        colors: ['#ec4899', '#f59e0b', '#ffd700', '#10b981']
+      });
+    }, 400);
+
+    // Stage 4: Star shower rain burst
+    setTimeout(() => {
+      confetti({
+        particleCount: 45,
+        spread: 120,
+        startVelocity: 35,
+        decay: 0.92,
+        scalar: 1.2,
+        shapes: ['star'],
+        colors: ['#ffd700', '#f59e0b', '#ec4899'],
+        origin: { y: 0.4 }
+      });
+    }, 700);
+  }, []);
+
+  // Trigger party blast upon successful submission mount
+  useEffect(() => {
+    if (submittedData) {
+      firePartyPuff();
+    }
+  }, [submittedData, firePartyPuff]);
+
   const handleDownload = () => {
     if (submittedData) {
       generateAcknowledgementPDF(submittedData);
@@ -23,10 +79,11 @@ const Step10Submission = ({ isSubmitting, submittedData, onSubmit, onReset }) =>
         transition={{ duration: 0.5 }}
         className="text-center space-y-6 py-6 max-w-lg mx-auto print-container"
       >
-        {/* Success Tick Drawing */}
+        {/* Success Tick Drawing with Party Puff */}
         <SuccessAnimation />
 
         <div className="space-y-2">
+          
           <h2 className="font-heading text-3xl font-extrabold text-green-600 tracking-tight">
             Thank You!
           </h2>

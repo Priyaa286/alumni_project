@@ -7,26 +7,27 @@ const Header = () => {
         
         {/* Left: National Engineering College Logo */}
         <div className="flex items-center gap-3">
-          <img
-            src="/nec-logo.png"
-            alt="National Engineering College Logo"
-            className="h-20 md:h-24 w-auto object-contain filter drop-shadow-sm"
-          />
+          <div className="relative flex items-center justify-center p-1 bg-white/80 rounded-xl shadow-sm border border-primary/10">
+            <img
+              src="/nec-logo.png"
+              alt="National Engineering College Logo"
+              className="h-14 md:h-16 w-auto object-contain transition-transform duration-300 hover:scale-105"
+            />
+          </div>
           <div className="hidden sm:block">
-            <h1 className="font-heading font-extrabold text-lg md:text-1xl text-primary tracking-tight leading-tight">
-            NATIONAL ENGINEERING COLLEGE
-          </h1>
-          <p className="text-xs md:text-sm font-medium text-slate-500 tracking-wide">
-            K.R. Nagar, Kovilpatti - 628 503
-          </p>
+            <h1 className="font-heading font-extrabold text-base md:text-lg text-primary tracking-tight leading-tight">
+              NATIONAL ENGINEERING COLLEGE
+            </h1>
+            <p className="text-xs md:text-sm font-medium text-slate-500 tracking-wide">
+              K.R. Nagar, Kovilpatti - 628 503
+            </p>
           </div>
         </div>
 
         {/* Center: Branding & Subtitle */}
         <div className="text-center">
-          
-          <div className="inline-flex items-center gap-2 mt-1 px-4 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-            <span className="text-[14px] md:text-xm font-bold text-primary tracking-widest uppercase">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 shadow-sm">
+            <span className="text-xs md:text-sm font-bold text-primary tracking-widest uppercase font-heading">
               Notable Alumni Award Nomination Portal
             </span>
           </div>
@@ -34,15 +35,13 @@ const Header = () => {
 
         {/* Right: NEC Alumni Association Logo */}
         <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            
-            
+          <div className="relative flex items-center justify-center p-1 bg-white/80 rounded-xl shadow-sm border border-primary/10">
+            <img
+              src="/alumni-logo.png"
+              alt="NEC Alumni Association Logo"
+              className="h-14 md:h-16 w-auto object-contain transition-transform duration-300 hover:scale-105"
+            />
           </div>
-          <img
-            src="/alumni-logo.png"
-            alt="NEC Alumni Association Logo"
-            className="h-16 md:h-18 w-auto object-contain filter drop-shadow-sm"
-          />
         </div>
         
       </div>
