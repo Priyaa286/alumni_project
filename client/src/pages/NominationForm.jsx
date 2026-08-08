@@ -309,7 +309,7 @@ const NominationForm = () => {
                   {activeStep.id === 'professional' && <Step2Professional register={register} formState={formState} watch={watch} />}
                   {activeStep.id === 'category' && <Step3Category watch={watch} setValue={setValue} register={register} formState={formState} />}
                   {activeStep.id === 'categoryDetails' && <Step4CategoryDetails register={register} formState={formState} watch={watch} setValue={setValue} />}
-                  {activeStep.id === 'necContribution' && <Step5NECContribution register={register} formState={formState} />}
+                  {activeStep.id === 'necContribution' && <Step5NECContribution register={register} formState={formState} watch={watch} setValue={setValue} />}
                   {activeStep.id === 'documents' && <Step6Documents watch={watch} setValue={setValue} />}
                   {activeStep.id === 'nominator' && <Step7Nominator register={register} formState={formState} />}
                   {activeStep.id === 'declaration' && <Step8Declaration register={register} control={control} formState={formState} />}
