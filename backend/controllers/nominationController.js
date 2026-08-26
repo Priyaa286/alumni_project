@@ -208,3 +208,109 @@ exports.getCategories = async (req, res) => {
     });
   }
 };
+
+// Get All Nominations (Admin Dashboard endpoint)
+exports.getAllNominations = async (req, res) => {
+  try {
+    let nominations = [];
+
+    if (mongoose.connection.readyState === 1) {
+      nominations = await Nomination.find().sort({ createdAt: -1 });
+    } else {
+      // In-Memory Mode
+      nominations = Array.from(inMemoryNominations.values())
+        .filter((val, index, self) => self.findIndex(t => t._id === val._id) === index);
+    }
+
+    // Default Mock Nominations if database is empty
+    if (!nominations || nominations.length === 0) {
+      nominations = [
+        {
+          _id: 'mock_101',
+          nominationId: 'NOM-2026-0001',
+          category: 'Scientific',
+          status: 'Submitted',
+          createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+          nominee: {
+            fullName: 'Dr. A. R. Sundaram',
+            degree: 'B.E. Computer Science',
+            graduationYear: '2008',
+            designation: 'Principal AI Researcher',
+            organization: 'DeepMind Robotics',
+            email: 'sundaram.ar@example.com',
+            mobile: '+91 98765 43210'
+          },
+          nominator: {
+            fullName: 'Prof. K. Subramanian',
+            relationToNominee: 'Former Professor & HOD',
+            email: 'subramanian.k@nec.edu',
+            mobile: '+91 94431 12345'
+          },
+          accomplishments: 'Pioneered breakthroughs in neural network optimization for medical imaging algorithms, published over 40 high-impact papers, and holds 6 international patents.',
+          contributionsToNEC: 'Guest speaker for annual alumni tech symposium and established research scholarship fund for underprivileged engineering students.'
+        },
+        {
+          _id: 'mock_102',
+          nominationId: 'NOM-2026-0002',
+          category: 'Business',
+          status: 'Under Review',
+          createdAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
+          nominee: {
+            fullName: 'Priya Venkatesh',
+            degree: 'B.Tech Information Technology',
+            graduationYear: '2012',
+            designation: 'Founder & CEO',
+            organization: 'EcoGrid Tech Solutions',
+            email: 'priya.v@ecogridtech.com',
+            mobile: '+91 98123 76543'
+          },
+          nominator: {
+            fullName: 'Rajesh Kumar',
+            relationToNominee: 'Batchmate & Co-founder',
+            email: 'rajesh.k@ecogridtech.com',
+            mobile: '+91 98989 12345'
+          },
+          accomplishments: 'Built a clean-tech startup valued at $50M that provides smart solar microgrids across rural South India, empowering 500+ villages.',
+          contributionsToNEC: 'Provides campus recruitment opportunities and sponsors NEC Innovation Incubator lab.'
+        },
+        {
+          _id: 'mock_103',
+          nominationId: 'NOM-2026-0003',
+          category: 'Social',
+          status: 'Approved',
+          createdAt: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
+          nominee: {
+            fullName: 'Captain M. Ramesh',
+            degree: 'B.E. Mechanical Engineering',
+            graduationYear: '2001',
+            designation: 'Director of Operations',
+            organization: 'Asha Rural Foundation',
+            email: 'm.ramesh@ashafoundation.org',
+            mobile: '+91 97711 22334'
+          },
+          nominator: {
+            fullName: 'Dr. V. Meenakshi',
+            relationToNominee: 'Alumni Association Member',
+            email: 'meenakshi.v@nec.edu',
+            mobile: '+91 94422 99887'
+          },
+          accomplishments: 'Leads disaster relief operations and clean drinking water initiatives across flood-prone regions, benefitting over 100,000 households.',
+          contributionsToNEC: 'Key organizer for NEC Alumni Benevolent Fund and mentor for student NSS chapter.'
+        }
+      ];
+    }
+
+    res.status(200).json({
+      success: true,
+      count: nominations.length,
+      data: nominations
+    });
+  } catch (error) {
+    console.error('Error fetching all nominations:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve nominations'
+    });
+  }
+};
+
