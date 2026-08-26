@@ -101,9 +101,12 @@ const Step5NECContribution = ({ register, formState: { errors }, watch, setValue
     if (force || !currentDetails) {
       const activeKeys = force ? defaultChecked : (selectedActivities.length > 0 ? selectedActivities : defaultChecked);
       const generatedDetails = activeKeys
-        .map((key) => `• ${contributionRecords[key]?.summary || ''}`)
+        .map((key) => {
+          const rec = contributionRecords[key];
+          return rec ? `${rec.title}: ${rec.badge}` : `${key}: Contribution Recorded`;
+        })
         .filter(Boolean)
-        .join('\n\n');
+        .join('\n');
 
       setValue('necContribution.details', generatedDetails, { shouldValidate: true });
     }
@@ -127,9 +130,9 @@ const Step5NECContribution = ({ register, formState: { errors }, watch, setValue
     const generated = selectedActivities
       .map((key) => {
         const record = contributionRecords[key];
-        return record ? `• ${record.summary}` : `• Contributed to ${key}.`;
+        return record ? `${record.title}: ${record.badge}` : `${key}: Contribution Recorded`;
       })
-      .join('\n\n');
+      .join('\n');
 
     if (setValue) {
       setValue('necContribution.details', generated, { shouldValidate: true });
