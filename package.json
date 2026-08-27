@@ -8,5 +8,8 @@
     "dev:backend": "npm --prefix backend run dev",
     "build": "npm --prefix client run build",
     "start": "npm --prefix backend start"
+  },
+  "dependencies": {
+    "react-router-dom": "^7.18.2"
   }
 }

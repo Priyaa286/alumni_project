@@ -34,15 +34,14 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     const cleanEmail = email.trim().toLowerCase();
 
-    // Demo fallback credentials
+    // Demo fallback credentials (Admin Only)
     const DEMO_FALLBACK = [
-      { email: 'admin@nec.edu', password: 'admin123', role: 'admin', name: 'NEC Admin' },
-      { email: 'user@nec.edu', password: 'user123', role: 'user', name: 'NEC Nominator' }
+      { email: 'admin@nec.edu', password: 'admin123', role: 'admin', name: 'NEC Admin' }
     ];
 
     try {
       const res = await loginApi(email, password);
-      if (res.success && res.user) {
+      if (res.success && res.user && res.user.role === 'admin') {
         const newState = {
           isAuthenticated: true,
           user: res.user,
@@ -52,14 +51,14 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('auth_user', JSON.stringify(newState));
         return { success: true, user: res.user };
       } else {
-        return { success: false, message: res.message || 'Invalid email or password' };
+        return { success: false, message: 'Access denied. Only Admin login is allowed.' };
       }
     } catch (err) {
       console.warn('Backend API login failed or unreachable, checking offline demo fallback:', err);
       
       // Fallback verification for demo credentials when backend is down
       const match = DEMO_FALLBACK.find(
-        (u) => u.email.toLowerCase() === cleanEmail && u.password === password
+        (u) => u.email.toLowerCase() === cleanEmail && u.password === password && u.role === 'admin'
       );
 
       if (match) {
@@ -73,7 +72,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true, user: newState.user };
       }
 
-      const msg = err.response?.data?.message || 'Invalid email or password';
+      const msg = err.response?.data?.message || 'Invalid email or password. Access is restricted to Admin accounts only.';
       return { success: false, message: msg };
     } finally {
       setLoading(false);

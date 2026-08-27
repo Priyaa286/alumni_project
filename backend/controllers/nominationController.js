@@ -9,6 +9,51 @@ let inMemorySeq = 0;
 // Create a new Nomination
 exports.createNomination = async (req, res) => {
   try {
+    const nomineeEmail = (req.body.nominee?.email || req.body.email || '').trim().toLowerCase();
+    const nomineeMobile = (req.body.nominee?.mobile || req.body.mobile || '').trim();
+    const nomineeName = (req.body.nominee?.name || req.body.nominee?.fullName || req.body.nomineeName || '').trim().toLowerCase();
+
+    // Check for duplicate nomination entry
+    if (mongoose.connection.readyState === 1) {
+      const orConditions = [];
+      if (nomineeEmail) orConditions.push({ 'nominee.email': nomineeEmail }, { email: nomineeEmail });
+      if (nomineeMobile) orConditions.push({ 'nominee.mobile': nomineeMobile }, { mobile: nomineeMobile });
+      if (nomineeName) {
+        orConditions.push({ 'nominee.name': { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
+        orConditions.push({ 'nominee.fullName': { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
+        orConditions.push({ nomineeName: { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
+      }
+
+      if (orConditions.length > 0) {
+        const existingNomination = await Nomination.findOne({ $or: orConditions });
+        if (existingNomination) {
+          return res.status(400).json({
+            success: false,
+            message: 'A nomination for this nominee has already been submitted. Duplicate entries are not allowed.'
+          });
+        }
+      }
+    }
+
+    // Check in-memory store for duplicate
+    for (const item of inMemoryNominations.values()) {
+      if (!item) continue;
+      const existingEmail = (item.nominee?.email || item.email || '').trim().toLowerCase();
+      const existingMobile = (item.nominee?.mobile || item.mobile || '').trim();
+      const existingName = (item.nominee?.name || item.nominee?.fullName || item.nomineeName || '').trim().toLowerCase();
+
+      if (
+        (nomineeEmail && existingEmail && nomineeEmail === existingEmail) ||
+        (nomineeMobile && existingMobile && nomineeMobile === existingMobile) ||
+        (nomineeName && existingName && nomineeName === existingName)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'A nomination for this nominee has already been submitted. Duplicate entries are not allowed.'
+        });
+      }
+    }
+
     const currentYear = new Date().getFullYear();
     let nominationId;
     let savedNomination;
@@ -226,11 +271,14 @@ exports.getAllNominations = async (req, res) => {
 
     const memNominations = Array.from(inMemoryNominations.values());
 
-    // Merge DB records and Memory records deduplicated by nominationId or _id
+    // Merge DB records and Memory records deduplicated by nominee email / name
     const combined = [...dbNominations, ...memNominations];
     const map = new Map();
     combined.forEach(item => {
-      const key = item.nominationId || String(item._id);
+      if (!item) return;
+      const email = (item.nominee?.email || item.email || '').trim().toLowerCase();
+      const name = (item.nominee?.name || item.nominee?.fullName || item.nomineeName || '').trim().toLowerCase();
+      const key = email || name || item.nominationId || String(item._id);
       if (!map.has(key)) {
         map.set(key, item.toObject ? item.toObject() : item);
       }

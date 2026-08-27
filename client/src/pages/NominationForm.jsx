@@ -21,6 +21,54 @@ import { submitNomination } from '../services/api';
 
 const LOCAL_STORAGE_KEY = 'nec_nomination_draft';
 
+const EMPTY_FORM_VALUES = {
+  nominationType: 'self',
+  category: '',
+  categoryDetails: {},
+  accomplishments: '',
+  contributionsToNEC: '',
+  documents: {},
+  nominee: {
+    name: '',
+    batch: '',
+    department: '',
+    mobile: '',
+    email: '',
+    dob: '',
+    degree: '',
+    address: '',
+    city: '',
+    state: '',
+    country: '',
+    pincode: '',
+    linkedin: '',
+    isRegisteredAlumni: ''
+  },
+  professional: {
+    designation: '',
+    organization: '',
+    location: '',
+    experience: '',
+    experienceYears: '',
+    profileSummary: '',
+    website: '',
+    linkedIn: ''
+  },
+  nominator: {
+    name: '',
+    relationToNominee: '',
+    mobile: '',
+    email: '',
+    organization: '',
+    designation: ''
+  },
+  declaration: {
+    agreed: false,
+    signatureName: '',
+    date: ''
+  }
+};
+
 const NominationForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,9 +78,9 @@ const NominationForm = () => {
   const [defaultValues] = useState(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : {};
+      return saved ? JSON.parse(saved) : EMPTY_FORM_VALUES;
     } catch (e) {
-      return {};
+      return EMPTY_FORM_VALUES;
     }
   });
 
@@ -261,11 +309,18 @@ const NominationForm = () => {
 
   // Reset form and go back to step 1
   const handleReset = () => {
-    reset({});
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    reset(EMPTY_FORM_VALUES, {
+      keepDefaultValues: false,
+      keepValues: false,
+      keepErrors: false,
+      keepDirty: false,
+      keepTouched: false
+    });
     setSubmittedData(null);
     setCurrentStep(1);
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-    toast.info('Form cleared. Ready for new nomination.');
+    window.scrollTo(0, 0);
+    toast.info('Form cleared. All input fields have been reset.');
   };
 
   // Redirect to corresponding step on review edit request

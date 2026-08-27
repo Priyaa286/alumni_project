@@ -191,29 +191,6 @@ const AdminResponsesContent = () => {
       },
       accomplishments: 'Leads disaster relief operations and clean drinking water initiatives across flood-prone regions, benefitting over 100,000 households.',
       contributionsToNEC: 'Key organizer for NEC Alumni Benevolent Fund and mentor for student NSS chapter.'
-    },
-    {
-      _id: 'mock_104',
-      nominationId: 'NOM-2026-0004',
-      category: 'Scientific',
-      status: 'Submitted',
-      createdAt: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
-      nominee: {
-        name: 'Dr. A. R. Sundaram',
-        batch: '2008',
-        department: 'Computer Science & Engineering',
-        designation: 'Principal AI Researcher',
-        organization: 'DeepMind Robotics',
-        email: 'sundaram.ar@example.com',
-        mobile: '+91 98765 43210'
-      },
-      nominator: {
-        name: 'Dr. S. Karthik',
-        email: 'karthik.s@nec.edu',
-        mobile: '+91 98888 77777'
-      },
-      accomplishments: 'Second endorsement for Dr. A. R. Sundaram for national awards.',
-      contributionsToNEC: 'Continuous mentorship.'
     }
   ];
 
@@ -222,7 +199,6 @@ const AdminResponsesContent = () => {
     try {
       const res = await getAllNominations();
       if (res && res.success && Array.isArray(res.data)) {
-        // Use real submitted nominations directly from database if available, otherwise use fallback demo data if array is empty
         if (res.data.length > 0) {
           setNominations(res.data);
         } else {
@@ -243,7 +219,21 @@ const AdminResponsesContent = () => {
     fetchNominations();
   }, []);
 
-  const safeNominations = useMemo(() => (Array.isArray(nominations) ? nominations : []), [nominations]);
+  // Safe Deduplicated Nominations list
+  const safeNominations = useMemo(() => {
+    const raw = Array.isArray(nominations) ? nominations : [];
+    const map = new Map();
+    raw.forEach((item) => {
+      if (!item) return;
+      const email = ensureString(item.nominee?.email || item.email).toLowerCase();
+      const name = getNomineeName(item).toLowerCase();
+      const key = email || name || item.nominationId || String(item._id);
+      if (!map.has(key)) {
+        map.set(key, item);
+      }
+    });
+    return Array.from(map.values());
+  }, [nominations]);
 
   // Compute Unique Categories and Batches
   const categories = useMemo(() => {
@@ -290,284 +280,184 @@ const AdminResponsesContent = () => {
     });
   }, [safeNominations, searchTerm, selectedCategory, selectedBatch]);
 
-  // Rank nominees by total nomination/vote tally
-  const rankedLeaderboard = useMemo(() => {
-    const map = new Map();
-    safeNominations.forEach((item) => {
-      if (!item) return;
-      const name = getNomineeName(item);
-      const email = ensureString(item.nominee?.email || item.email);
-      const batch = getNomineeBatch(item);
-      const dept = getNomineeDepartment(item);
-      const category = ensureString(item.category, 'General');
-
-      if (!name || name === 'N/A') return;
-
-      const key = email ? email.toLowerCase() : name.toLowerCase();
-
-      if (!map.has(key)) {
-        map.set(key, {
-          name,
-          email,
-          batch,
-          department: dept,
-          category,
-          votes: 1,
-        });
-      } else {
-        const existing = map.get(key);
-        existing.votes += 1;
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => b.votes - a.votes);
-  }, [safeNominations]);
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-      {/* Metrics Summary Bar (Categories Represented Removed) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-purple-50 text-purple-600">
-            <Users className="w-6 h-6" />
+      {/* Main Section: Search, Filters & Responses Table */}
+      <div className="w-full space-y-6">
+        {/* Controls Bar: Search, Category & Batch Filters */}
+        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Search */}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search name, batch, nominator..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+            />
           </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Submissions</p>
-            <p className="text-2xl font-extrabold text-slate-900">{safeNominations.length}</p>
-          </div>
-        </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
-            <GraduationCap className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Batches Represented</p>
-            <p className="text-2xl font-extrabold text-slate-900">{batches.length > 1 ? batches.length - 1 : 0}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid Layout: Responses Table (Left 3 cols) + Nominees by Votes Sidebar (Right 1 col) */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        
-        {/* Main Section: Search, Filters & Responses Table */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* Controls Bar: Search, Category & Batch Filters */}
-          <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search name, batch, nominator..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-              />
-            </div>
-
-            {/* Category & Batch Filters & Refresh */}
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-              {/* Category Filter */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-600 font-bold">
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white"
-                >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      Category: {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Batch Filter */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-600 font-bold">
-                <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
-                <select
-                  value={selectedBatch}
-                  onChange={(e) => setSelectedBatch(e.target.value)}
-                  className="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white"
-                >
-                  {batches.map((b) => (
-                    <option key={b} value={b}>
-                      Batch: {b}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Refresh Button */}
-              <button
-                onClick={fetchNominations}
-                title="Refresh List"
-                className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+          {/* Category & Batch Filters & Refresh */}
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            {/* Category Filter */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-bold">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    Category: {cat}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {/* Nominations Table */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            {loading ? (
-              <div className="p-12 text-center text-slate-500 space-y-3">
-                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
-                <p className="text-sm font-medium">Loading nomination responses...</p>
-              </div>
-            ) : filteredNominations.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 space-y-2">
-                <FileText className="w-12 h-12 text-slate-300 mx-auto" />
-                <p className="text-base font-bold text-slate-700">No Nominations Found</p>
-                <p className="text-xs text-slate-400">Try adjusting your search query, batch, or category filter.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] uppercase tracking-wider font-extrabold text-slate-500">
-                      <th className="py-4 px-6">ID & Date</th>
-                      <th className="py-4 px-6">Nominee Name</th>
-                      <th className="py-4 px-6">Award Category</th>
-                      <th className="py-4 px-6">Nominator</th>
-                      <th className="py-4 px-6">Contact Info</th>
-                      <th className="py-4 px-6 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm">
-                    {filteredNominations.map((item) => {
-                      const nomineeName = getNomineeName(item);
-                      const nomineeBatch = getNomineeBatch(item);
-                      const nomineeDept = getNomineeDepartment(item);
-                      const nomineeEmail = ensureString(item.nominee?.email || item.email, 'N/A');
-                      const nomineeMobile = ensureString(item.nominee?.mobile || item.mobile, 'N/A');
-                      const nominatorName = getNominatorName(item);
-                      const nominatorContact = getNominatorContact(item);
-                      const dateStr = item.createdAt
-                        ? new Date(item.createdAt).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })
-                        : 'N/A';
+            {/* Batch Filter */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-bold">
+              <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={selectedBatch}
+                onChange={(e) => setSelectedBatch(e.target.value)}
+                className="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white"
+              >
+                {batches.map((b) => (
+                  <option key={b} value={b}>
+                    Batch: {b}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                      return (
-                        <tr key={item._id || item.nominationId} className="hover:bg-purple-50/30 transition-colors">
-                          {/* ID & Date */}
-                          <td className="py-4 px-6 font-mono text-xs text-slate-500">
-                            <span className="font-bold text-primary block">{ensureString(item.nominationId)}</span>
-                            <span className="text-[11px] text-slate-400">{dateStr}</span>
-                          </td>
-
-                          {/* Nominee Name & Batch */}
-                          <td className="py-4 px-6">
-                            <div className="font-bold text-slate-900">{nomineeName}</div>
-                            <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                              {nomineeBatch !== 'N/A' && (
-                                <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
-                                  Batch {nomineeBatch}
-                                </span>
-                              )}
-                              {nomineeDept && <span>• {nomineeDept}</span>}
-                            </div>
-                          </td>
-
-                          {/* Award Category */}
-                          <td className="py-4 px-6">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-                              <Award className="w-3.5 h-3.5" />
-                              {ensureString(item.category, 'General')}
-                            </span>
-                          </td>
-
-                          {/* Nominator */}
-                          <td className="py-4 px-6">
-                            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                              <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                              {nominatorName}
-                            </div>
-                            {nominatorContact !== 'N/A' && (
-                              <div className="text-[11px] text-slate-400 truncate max-w-[160px]">
-                                {nominatorContact}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Contact Info */}
-                          <td className="py-4 px-6 text-xs text-slate-600 space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span>{nomineeEmail}</span>
-                            </div>
-                            {nomineeMobile !== 'N/A' && (
-                              <div className="flex items-center gap-1.5">
-                                <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                                <span>{nomineeMobile}</span>
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Actions */}
-                          <td className="py-4 px-6 text-right">
-                            <button
-                              onClick={() => setSelectedNomination(item)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-primary hover:text-white text-slate-700 text-xs font-bold transition-all duration-200 cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>View Details</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {/* Refresh Button */}
+            <button
+              onClick={fetchNominations}
+              title="Refresh List"
+              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
 
-        {/* Right Sidebar: Nominee Vote Standings (Ordered by highest votes, no rank) */}
-        <div className="lg:col-span-1 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <div className="p-2 rounded-xl bg-purple-50 text-primary">
-              <Trophy className="w-4 h-4" />
+        {/* Nominations Table */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden w-full">
+          {loading ? (
+            <div className="p-12 text-center text-slate-500 space-y-3">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+              <p className="text-sm font-medium">Loading nomination responses...</p>
             </div>
-            <div>
-              <h3 className="font-heading font-extrabold text-base text-slate-900">
-                Nominees by Votes
-              </h3>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Ordered by highest submission count
-              </p>
+          ) : filteredNominations.length === 0 ? (
+            <div className="p-12 text-center text-slate-500 space-y-2">
+              <FileText className="w-12 h-12 text-slate-300 mx-auto" />
+              <p className="text-base font-bold text-slate-700">No Nominations Found</p>
+              <p className="text-xs text-slate-400">Try adjusting your search query, batch, or category filter.</p>
             </div>
-          </div>
-
-          {rankedLeaderboard.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-4">No votes recorded yet.</p>
           ) : (
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-              {rankedLeaderboard.map((item, idx) => (
-                <div
-                  key={(item.email || item.name) + idx}
-                  className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-purple-50/40 transition-colors flex items-center justify-between gap-2"
-                >
-                  <div className="space-y-0.5 overflow-hidden">
-                    <p className="font-bold text-slate-900 text-xs truncate">{item.name}</p>
-                    <p className="text-[11px] text-slate-500 truncate">
-                      {item.batch !== 'N/A' ? `Batch ${item.batch}` : item.category}
-                    </p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-primary/10 text-primary border border-primary/20 shrink-0">
-                    {item.votes} {item.votes === 1 ? 'Vote' : 'Votes'}
-                  </span>
-                </div>
-              ))}
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse min-w-[850px]">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] uppercase tracking-wider font-extrabold text-slate-500">
+                    <th className="py-4 px-6 whitespace-nowrap">ID & Date</th>
+                    <th className="py-4 px-6 min-w-[200px]">Nominee Name</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Award Category</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Nominator</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Contact Info</th>
+                    <th className="py-4 px-6 text-right whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {filteredNominations.map((item) => {
+                    const nomineeName = getNomineeName(item);
+                    const nomineeBatch = getNomineeBatch(item);
+                    const nomineeDept = getNomineeDepartment(item);
+                    const nomineeEmail = ensureString(item.nominee?.email || item.email, 'N/A');
+                    const nomineeMobile = ensureString(item.nominee?.mobile || item.mobile, 'N/A');
+                    const nominatorName = getNominatorName(item);
+                    const nominatorContact = getNominatorContact(item);
+                    const dateStr = item.createdAt
+                      ? new Date(item.createdAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                      : 'N/A';
+
+                    return (
+                      <tr key={item._id || item.nominationId} className="hover:bg-purple-50/30 transition-colors">
+                        {/* ID & Date */}
+                        <td className="py-4 px-6 font-mono text-xs text-slate-500 whitespace-nowrap">
+                          <span className="font-bold text-primary block">{ensureString(item.nominationId)}</span>
+                          <span className="text-[11px] text-slate-400">{dateStr}</span>
+                        </td>
+
+                        {/* Nominee Name & Batch */}
+                        <td className="py-4 px-6">
+                          <div className="font-bold text-slate-900 whitespace-nowrap">{nomineeName}</div>
+                          <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                            {nomineeBatch !== 'N/A' && (
+                              <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                                Batch {nomineeBatch}
+                              </span>
+                            )}
+                            {nomineeDept && <span>• {nomineeDept}</span>}
+                          </div>
+                        </td>
+
+                        {/* Award Category */}
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                            <Award className="w-3.5 h-3.5" />
+                            {ensureString(item.category, 'General')}
+                          </span>
+                        </td>
+
+                        {/* Nominator */}
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                            <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                            {nominatorName}
+                          </div>
+                          {nominatorContact !== 'N/A' && (
+                            <div className="text-[11px] text-slate-400 truncate max-w-[180px]">
+                              {nominatorContact}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Contact Info */}
+                        <td className="py-4 px-6 text-xs text-slate-600 space-y-0.5 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{nomineeEmail}</span>
+                          </div>
+                          {nomineeMobile !== 'N/A' && (
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>{nomineeMobile}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-4 px-6 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => setSelectedNomination(item)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-primary hover:text-white text-slate-700 text-xs font-bold transition-all duration-200 cursor-pointer shadow-sm"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Details</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -1,16 +1,10 @@
-// Centralized Demo Credentials Configuration
+// Centralized Demo Credentials Configuration (Admin Only)
 const DEMO_USERS = [
   {
     email: 'admin@nec.edu',
     password: 'admin123',
     role: 'admin',
     name: 'NEC Admin',
-  },
-  {
-    email: 'user@nec.edu',
-    password: 'user123',
-    role: 'user',
-    name: 'NEC Nominator',
   }
 ];
 
@@ -30,10 +24,10 @@ exports.login = async (req, res) => {
       (u) => u.email.toLowerCase() === cleanEmail && u.password === password
     );
 
-    if (!foundUser) {
+    if (!foundUser || foundUser.role !== 'admin') {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email or password. Access is restricted to Admin accounts only.'
       });
     }
 

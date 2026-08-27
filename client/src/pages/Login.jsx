@@ -88,7 +88,7 @@ const Login = () => {
               <ShieldCheck className="w-8 h-8" />
             </div>
             <h2 className="font-heading font-extrabold text-2xl md:text-3xl text-slate-900 tracking-tight">
-              Portal Access
+              Admin Portal Access
             </h2>
             <p className="text-sm font-medium text-slate-500 mt-1">
               National Engineering College Alumni Association
@@ -112,7 +112,7 @@ const Login = () => {
             {/* Email Field */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Email Address
+                Admin Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -122,7 +122,7 @@ const Login = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@nec.edu"
+                  placeholder="admin@nec.edu"
                   disabled={isSubmitting || authLoading}
                   className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all text-slate-800 placeholder-slate-400 bg-slate-50/50 focus:bg-white text-sm"
                   required
@@ -163,48 +163,39 @@ const Login = () => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span>Authenticating...</span>
+                  <span>Authenticating Admin...</span>
                 </>
               ) : (
                 <>
                   <LogIn className="w-5 h-5" />
-                  <span>Sign In</span>
+                  <span>Admin Sign In</span>
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Credentials Panel */}
+          {/* Quick Demo Credentials Panel (Admin Only) */}
           <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center mb-3 flex items-center justify-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-primary" />
-              Demo Credentials (Click to fill)
+              Admin Credentials (Click to fill)
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div>
               <button
                 type="button"
                 onClick={() => fillDemoCredentials('admin@nec.edu', 'admin123')}
-                className="p-2.5 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors text-left group cursor-pointer"
+                className="w-full p-3 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors text-left group cursor-pointer flex items-center justify-between"
               >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-primary mb-0.5">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Admin User
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-primary mb-0.5">
+                    <ShieldCheck className="w-4 h-4" />
+                    Administrator Account
+                  </div>
+                  <div className="text-xs text-slate-600 font-mono">admin@nec.edu</div>
                 </div>
-                <div className="text-[11px] text-slate-600 font-mono">admin@nec.edu</div>
-                <div className="text-[10px] text-slate-400">Pass: admin123</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemoCredentials('user@nec.edu', 'user123')}
-                className="p-2.5 rounded-xl border border-secondary/20 bg-secondary/5 hover:bg-secondary/10 transition-colors text-left group cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-0.5">
-                  <UserCheck className="w-3.5 h-3.5 text-slate-600" />
-                  Normal User
+                <div className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                  Pass: admin123
                 </div>
-                <div className="text-[11px] text-slate-600 font-mono">user@nec.edu</div>
-                <div className="text-[10px] text-slate-400">Pass: user123</div>
               </button>
             </div>
           </div>
