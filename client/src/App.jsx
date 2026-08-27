@@ -1,15 +1,20 @@
 import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import Header from './components/Header';
+import Login from './pages/Login';
 import NominationForm from './pages/NominationForm';
+import AdminResponses from './pages/AdminResponses';
+import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './context/AuthContext';
 
-function App() {
+function AppContent() {
   return (
     <div className="min-h-screen flex flex-col bg-purplebg text-slate-800">
       {/* Toast Notification Container */}
       <ToastContainer
         position="top-right"
-        autoClose={5000}
+        autoClose={4000}
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick
@@ -23,9 +28,35 @@ function App() {
       {/* Official Header */}
       <Header />
 
-      {/* Main Content Area */}
+      {/* Main Content Area with Client Routing */}
       <main className="flex-grow w-full py-4">
-        <NominationForm />
+        <Routes>
+          {/* Public Login Route */}
+          <Route path="/login" element={<Login />} />
+
+          {/* User Nomination Form Route (Protected) */}
+          <Route
+            path="/nomination"
+            element={
+              <ProtectedRoute>
+                <NominationForm />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin Dashboard Route (Protected - Admin Only) */}
+          <Route
+            path="/admin/responses"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminResponses />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Default Redirect to /login */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
       </main>
 
       {/* Footer Details */}
@@ -40,6 +71,16 @@ function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
   );
 }
 

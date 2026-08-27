@@ -6,6 +6,7 @@ require('dotenv').config();
 const connectDB = require('./config/db');
 const nominationRoutes = require('./routes/nominationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const authRoutes = require('./routes/authRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 
 // Initialize database connection
@@ -17,7 +18,7 @@ const app = express();
 app.use(cors({
   origin: '*', // For development flexibility
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-role']
 }));
 app.use(express.json({ limit: '15mb' })); // Support larger JSON payloads (signature canvas and text data)
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
+app.use('/api', authRoutes);
 app.use('/api', nominationRoutes);
 app.use('/api', uploadRoutes);
 
