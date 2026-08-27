@@ -70,6 +70,11 @@ export const uploadFile = async (file, onUploadProgress) => {
   return response.data;
 };
 
+export const lookupMemberByEmail = async (email) => {
+  const response = await API.get(`/api/members/lookup?email=${encodeURIComponent(email)}`);
+  return response.data;
+};
+
 export default {
   loginUser,
   getAllNominations,
@@ -78,5 +83,6 @@ export default {
   updateNomination,
   getCategories,
   uploadFile,
+  lookupMemberByEmail,
 };
 

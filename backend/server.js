@@ -7,6 +7,7 @@ const connectDB = require('./config/db');
 const nominationRoutes = require('./routes/nominationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const authRoutes = require('./routes/authRoutes');
+const memberRoutes = require('./routes/memberRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 
 // Initialize database connection
@@ -30,6 +31,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api', authRoutes);
 app.use('/api', nominationRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api', memberRoutes);
 
 // Root route placeholder
 app.get('/', (req, res) => {
