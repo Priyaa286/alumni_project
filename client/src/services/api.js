@@ -8,6 +8,35 @@ const API = axios.create({
   },
 });
 
+// Interceptor to attach Auth token and role header from localStorage if available
+API.interceptors.request.use((config) => {
+  const stored = localStorage.getItem('auth_user');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed.token) {
+        config.headers.Authorization = `Bearer ${parsed.token}`;
+      }
+      if (parsed.user?.role) {
+        config.headers['x-user-role'] = parsed.user.role;
+      }
+    } catch (e) {
+      console.error('Error parsing stored auth in API interceptor', e);
+    }
+  }
+  return config;
+});
+
+export const loginUser = async (email, password) => {
+  const response = await API.post('/api/auth/login', { email, password });
+  return response.data;
+};
+
+export const getAllNominations = async () => {
+  const response = await API.get('/api/admin/nominations');
+  return response.data;
+};
+
 export const submitNomination = async (data) => {
   const response = await API.post('/api/nominations', data);
   return response.data;
@@ -42,9 +71,12 @@ export const uploadFile = async (file, onUploadProgress) => {
 };
 
 export default {
+  loginUser,
+  getAllNominations,
   submitNomination,
   getNomination,
   updateNomination,
   getCategories,
   uploadFile,
 };
+

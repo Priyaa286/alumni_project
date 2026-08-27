@@ -9,6 +9,51 @@ let inMemorySeq = 0;
 // Create a new Nomination
 exports.createNomination = async (req, res) => {
   try {
+    const nomineeEmail = (req.body.nominee?.email || req.body.email || '').trim().toLowerCase();
+    const nomineeMobile = (req.body.nominee?.mobile || req.body.mobile || '').trim();
+    const nomineeName = (req.body.nominee?.name || req.body.nominee?.fullName || req.body.nomineeName || '').trim().toLowerCase();
+
+    // Check for duplicate nomination entry
+    if (mongoose.connection.readyState === 1) {
+      const orConditions = [];
+      if (nomineeEmail) orConditions.push({ 'nominee.email': nomineeEmail }, { email: nomineeEmail });
+      if (nomineeMobile) orConditions.push({ 'nominee.mobile': nomineeMobile }, { mobile: nomineeMobile });
+      if (nomineeName) {
+        orConditions.push({ 'nominee.name': { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
+        orConditions.push({ 'nominee.fullName': { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
+        orConditions.push({ nomineeName: { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
+      }
+
+      if (orConditions.length > 0) {
+        const existingNomination = await Nomination.findOne({ $or: orConditions });
+        if (existingNomination) {
+          return res.status(400).json({
+            success: false,
+            message: 'A nomination for this nominee has already been submitted. Duplicate entries are not allowed.'
+          });
+        }
+      }
+    }
+
+    // Check in-memory store for duplicate
+    for (const item of inMemoryNominations.values()) {
+      if (!item) continue;
+      const existingEmail = (item.nominee?.email || item.email || '').trim().toLowerCase();
+      const existingMobile = (item.nominee?.mobile || item.mobile || '').trim();
+      const existingName = (item.nominee?.name || item.nominee?.fullName || item.nomineeName || '').trim().toLowerCase();
+
+      if (
+        (nomineeEmail && existingEmail && nomineeEmail === existingEmail) ||
+        (nomineeMobile && existingMobile && nomineeMobile === existingMobile) ||
+        (nomineeName && existingName && nomineeName === existingName)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'A nomination for this nominee has already been submitted. Duplicate entries are not allowed.'
+        });
+      }
+    }
+
     const currentYear = new Date().getFullYear();
     let nominationId;
     let savedNomination;
@@ -32,6 +77,13 @@ exports.createNomination = async (req, res) => {
 
       const nomination = new Nomination(nominationData);
       savedNomination = await nomination.save();
+      console.log(`[MongoDB Atlas] Nomination saved successfully with ID: ${nominationId}`);
+
+      // Sync into in-memory store so admin fetch retrieves it instantaneously
+      inMemoryNominations.set(nominationId, savedNomination.toObject ? savedNomination.toObject() : savedNomination);
+      if (savedNomination._id) {
+        inMemoryNominations.set(String(savedNomination._id), savedNomination.toObject ? savedNomination.toObject() : savedNomination);
+      }
     } else {
       // In-Memory Mode
       inMemorySeq += 1;
@@ -208,3 +260,121 @@ exports.getCategories = async (req, res) => {
     });
   }
 };
+
+// Get All Nominations (Admin Dashboard endpoint)
+exports.getAllNominations = async (req, res) => {
+  try {
+    let dbNominations = [];
+    if (mongoose.connection.readyState === 1) {
+      dbNominations = await Nomination.find().sort({ createdAt: -1 });
+    }
+
+    const memNominations = Array.from(inMemoryNominations.values());
+
+    // Merge DB records and Memory records deduplicated by nominee email / name
+    const combined = [...dbNominations, ...memNominations];
+    const map = new Map();
+    combined.forEach(item => {
+      if (!item) return;
+      const email = (item.nominee?.email || item.email || '').trim().toLowerCase();
+      const name = (item.nominee?.name || item.nominee?.fullName || item.nomineeName || '').trim().toLowerCase();
+      const key = email || name || item.nominationId || String(item._id);
+      if (!map.has(key)) {
+        map.set(key, item.toObject ? item.toObject() : item);
+      }
+    });
+
+    nominations = Array.from(map.values());
+
+    // Default Mock Nominations if database is empty
+    if (!nominations || nominations.length === 0) {
+      nominations = [
+        {
+          _id: 'mock_101',
+          nominationId: 'NOM-2026-0001',
+          category: 'Scientific',
+          status: 'Submitted',
+          createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+          nominee: {
+            fullName: 'Dr. A. R. Sundaram',
+            degree: 'B.E. Computer Science',
+            graduationYear: '2008',
+            designation: 'Principal AI Researcher',
+            organization: 'DeepMind Robotics',
+            email: 'sundaram.ar@example.com',
+            mobile: '+91 98765 43210'
+          },
+          nominator: {
+            fullName: 'Prof. K. Subramanian',
+            relationToNominee: 'Former Professor & HOD',
+            email: 'subramanian.k@nec.edu',
+            mobile: '+91 94431 12345'
+          },
+          accomplishments: 'Pioneered breakthroughs in neural network optimization for medical imaging algorithms, published over 40 high-impact papers, and holds 6 international patents.',
+          contributionsToNEC: 'Guest speaker for annual alumni tech symposium and established research scholarship fund for underprivileged engineering students.'
+        },
+        {
+          _id: 'mock_102',
+          nominationId: 'NOM-2026-0002',
+          category: 'Business',
+          status: 'Under Review',
+          createdAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
+          nominee: {
+            fullName: 'Priya Venkatesh',
+            degree: 'B.Tech Information Technology',
+            graduationYear: '2012',
+            designation: 'Founder & CEO',
+            organization: 'EcoGrid Tech Solutions',
+            email: 'priya.v@ecogridtech.com',
+            mobile: '+91 98123 76543'
+          },
+          nominator: {
+            fullName: 'Rajesh Kumar',
+            relationToNominee: 'Batchmate & Co-founder',
+            email: 'rajesh.k@ecogridtech.com',
+            mobile: '+91 98989 12345'
+          },
+          accomplishments: 'Built a clean-tech startup valued at $50M that provides smart solar microgrids across rural South India, empowering 500+ villages.',
+          contributionsToNEC: 'Provides campus recruitment opportunities and sponsors NEC Innovation Incubator lab.'
+        },
+        {
+          _id: 'mock_103',
+          nominationId: 'NOM-2026-0003',
+          category: 'Social',
+          status: 'Approved',
+          createdAt: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
+          nominee: {
+            fullName: 'Captain M. Ramesh',
+            degree: 'B.E. Mechanical Engineering',
+            graduationYear: '2001',
+            designation: 'Director of Operations',
+            organization: 'Asha Rural Foundation',
+            email: 'm.ramesh@ashafoundation.org',
+            mobile: '+91 97711 22334'
+          },
+          nominator: {
+            fullName: 'Dr. V. Meenakshi',
+            relationToNominee: 'Alumni Association Member',
+            email: 'meenakshi.v@nec.edu',
+            mobile: '+91 94422 99887'
+          },
+          accomplishments: 'Leads disaster relief operations and clean drinking water initiatives across flood-prone regions, benefitting over 100,000 households.',
+          contributionsToNEC: 'Key organizer for NEC Alumni Benevolent Fund and mentor for student NSS chapter.'
+        }
+      ];
+    }
+
+    res.status(200).json({
+      success: true,
+      count: nominations.length,
+      data: nominations
+    });
+  } catch (error) {
+    console.error('Error fetching all nominations:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve nominations'
+    });
+  }
+};
+
