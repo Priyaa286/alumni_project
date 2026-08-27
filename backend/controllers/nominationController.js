@@ -32,6 +32,13 @@ exports.createNomination = async (req, res) => {
 
       const nomination = new Nomination(nominationData);
       savedNomination = await nomination.save();
+      console.log(`[MongoDB Atlas] Nomination saved successfully with ID: ${nominationId}`);
+
+      // Sync into in-memory store so admin fetch retrieves it instantaneously
+      inMemoryNominations.set(nominationId, savedNomination.toObject ? savedNomination.toObject() : savedNomination);
+      if (savedNomination._id) {
+        inMemoryNominations.set(String(savedNomination._id), savedNomination.toObject ? savedNomination.toObject() : savedNomination);
+      }
     } else {
       // In-Memory Mode
       inMemorySeq += 1;
@@ -212,15 +219,24 @@ exports.getCategories = async (req, res) => {
 // Get All Nominations (Admin Dashboard endpoint)
 exports.getAllNominations = async (req, res) => {
   try {
-    let nominations = [];
-
+    let dbNominations = [];
     if (mongoose.connection.readyState === 1) {
-      nominations = await Nomination.find().sort({ createdAt: -1 });
-    } else {
-      // In-Memory Mode
-      nominations = Array.from(inMemoryNominations.values())
-        .filter((val, index, self) => self.findIndex(t => t._id === val._id) === index);
+      dbNominations = await Nomination.find().sort({ createdAt: -1 });
     }
+
+    const memNominations = Array.from(inMemoryNominations.values());
+
+    // Merge DB records and Memory records deduplicated by nominationId or _id
+    const combined = [...dbNominations, ...memNominations];
+    const map = new Map();
+    combined.forEach(item => {
+      const key = item.nominationId || String(item._id);
+      if (!map.has(key)) {
+        map.set(key, item.toObject ? item.toObject() : item);
+      }
+    });
+
+    nominations = Array.from(map.values());
 
     // Default Mock Nominations if database is empty
     if (!nominations || nominations.length === 0) {

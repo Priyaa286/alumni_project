@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { ArrowLeft, ArrowRight, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, RotateCcw } from 'lucide-react';
 
 import ProgressBar from '../components/ProgressBar';
 import Sidebar from '../components/Sidebar';
@@ -343,15 +343,28 @@ const NominationForm = () => {
                   <div />
                 )}
 
-                {/* Draft Manual Save Button */}
-                <button
-                  type="button"
-                  onClick={handleManualSave}
-                  className="px-5 py-2.5 bg-white text-primary border border-borderlight hover:bg-slate-50 font-bold text-sm rounded-full flex items-center gap-2 transition-colors shadow-sm"
-                >
-                  <Save className="w-4 h-4" />
-                  Save Draft
-                </button>
+                {/* Save Draft and Clear Form Action Buttons */}
+                <div className="flex items-center gap-3">
+                  {/* Clear Form Button */}
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 font-bold text-sm rounded-full flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Clear Form
+                  </button>
+
+                  {/* Draft Manual Save Button */}
+                  <button
+                    type="button"
+                    onClick={handleManualSave}
+                    className="px-5 py-2.5 bg-white text-primary border border-borderlight hover:bg-slate-50 font-bold text-sm rounded-full flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save Draft
+                  </button>
+                </div>
 
                 {/* Next button */}
                 {currentStep < activeSteps.length ? (

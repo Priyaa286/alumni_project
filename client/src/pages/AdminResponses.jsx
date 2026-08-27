@@ -221,8 +221,13 @@ const AdminResponsesContent = () => {
     setLoading(true);
     try {
       const res = await getAllNominations();
-      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setNominations(res.data);
+      if (res && res.success && Array.isArray(res.data)) {
+        // Use real submitted nominations directly from database if available, otherwise use fallback demo data if array is empty
+        if (res.data.length > 0) {
+          setNominations(res.data);
+        } else {
+          setNominations(MOCK_FALLBACK_NOMINATIONS);
+        }
       } else {
         setNominations(MOCK_FALLBACK_NOMINATIONS);
       }
