@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
+import { Sparkles, CheckCircle2 } from 'lucide-react';
+import { lookupMemberByEmail } from '../services/api';
 
-const Step1Nominee = ({ register, formState: { errors }, watch }) => {
+const Step1Nominee = ({ register, formState: { errors }, watch, setValue }) => {
+  const [isAutofetching, setIsAutofetching] = useState(false);
+  const [autofetchedName, setAutofetchedName] = useState(null);
+  const lastFetchedEmailRef = useRef('');
+
   // Common departments at National Engineering College
   const departments = [
     { value: 'Computer Science and Engineering', label: 'Computer Science and Engineering (CSE)' },
@@ -13,16 +20,87 @@ const Step1Nominee = ({ register, formState: { errors }, watch }) => {
     { value: 'Artificial Intelligence and Data Science', label: 'Artificial Intelligence and Data Science (AIDS)' },
   ];
 
-  // Batch options from 1988 (first graduating batch) to 2025
-  const currentYear = new Date().getFullYear();
+  // Batch options from 1988 (first graduating batch) to 2026
+  const currentYear = 2026;
   const batches = Array.from({ length: currentYear - 1987 }, (_, i) => String(currentYear - i));
   const nominationType = watch('nominationType');
+  const nomineeEmail = watch('nominee.email');
+
+  // Automatic autofetching when email ID is entered
+  useEffect(() => {
+    if (!nomineeEmail) {
+      setAutofetchedName(null);
+      return;
+    }
+
+    const trimmedEmail = nomineeEmail.trim().toLowerCase();
+    const isValidEmail = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(trimmedEmail);
+
+    if (!isValidEmail || trimmedEmail === lastFetchedEmailRef.current) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      lastFetchedEmailRef.current = trimmedEmail;
+      try {
+        setIsAutofetching(true);
+        const res = await lookupMemberByEmail(trimmedEmail);
+
+        if (res && res.success && res.data) {
+          const data = res.data;
+          if (setValue) {
+            if (data.name) setValue('nominee.name', data.name, { shouldValidate: true });
+            if (data.batch) setValue('nominee.batch', String(data.batch), { shouldValidate: true });
+
+            if (data.department) {
+              const matchedDept = departments.find(
+                d => d.value.toLowerCase() === data.department.toLowerCase() ||
+                     d.label.toLowerCase().includes(data.department.toLowerCase())
+              );
+              setValue('nominee.department', matchedDept ? matchedDept.value : data.department, { shouldValidate: true });
+            }
+
+            if (data.mobile) setValue('nominee.mobile', data.mobile, { shouldValidate: true });
+            if (data.city) setValue('nominee.city', data.city, { shouldValidate: true });
+            if (data.address) setValue('nominee.address', data.address, { shouldValidate: true });
+            if (data.state) setValue('nominee.state', data.state, { shouldValidate: true });
+            if (data.country) setValue('nominee.country', data.country, { shouldValidate: true });
+            if (data.linkedin) setValue('nominee.linkedin', data.linkedin, { shouldValidate: true });
+            setValue('nominee.isRegisteredAlumni', 'Yes', { shouldValidate: true });
+
+            if (data.professional?.designation) {
+              setValue('professional.designation', data.professional.designation, { shouldValidate: true });
+            }
+            if (data.professional?.organization) {
+              setValue('professional.organization', data.professional.organization, { shouldValidate: true });
+            }
+          }
+
+          setAutofetchedName(data.name);
+          toast.success(`Alumni record found for ${data.name}! Details auto-filled.`);
+        }
+      } catch (err) {
+        setAutofetchedName(null);
+        const errorMsg = err.response?.data?.message || `No matching record for "${trimmedEmail}". Please fill in manually.`;
+        toast.info(errorMsg);
+      } finally {
+        setIsAutofetching(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [nomineeEmail, setValue]);
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-borderlight pb-4">
-        <h2 className="font-heading text-xl font-bold text-primary">Nominee Details</h2>
-        <p className="text-xs text-slate-500 mt-1">Please provide the personal and contact details of the alumnus being nominated.</p>
+      <div className="border-b border-borderlight pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="font-heading text-xl font-bold text-primary">Nominee Details</h2>
+          <p className="text-xs text-slate-500 mt-1">Please provide the personal and contact details of the alumnus being nominated.</p>
+        </div>
+
+        {/* Info Banner */}
+        
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -113,11 +191,20 @@ const Step1Nominee = ({ register, formState: { errors }, watch }) => {
           )}
         </div>
 
-        {/* Email Address */}
+        {/* Email Address with Automatic Autofetch */}
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold text-slate-700">
-            Email Address <span className="text-red-500">*</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-bold text-slate-700">
+              Email Address <span className="text-red-500">*</span>
+            </label>
+            {isAutofetching && (
+              <span className="text-xs font-semibold text-primary flex items-center gap-1.5 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                Fetching record...
+              </span>
+            )}
+
+          </div>
           <input
             type="email"
             placeholder="example@domain.com"

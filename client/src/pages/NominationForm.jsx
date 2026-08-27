@@ -178,10 +178,8 @@ const NominationForm = () => {
     setPrevNominationType(nominationType);
   }, [nominationType, prevNominationType, setValue]);
 
-  // Save form progress automatically to local storage whenever values change
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formValues));
-  }, [formValues]);
+  // Note: Form progress is ONLY saved to local storage when user explicitly clicks "Save Draft"
+
 
   // Real-time helper to verify step validity based on active step identifier
   const isStepValid = () => {
@@ -360,7 +358,7 @@ const NominationForm = () => {
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.3 }}
                 >
-                  {activeStep.id === 'nominee' && <Step1Nominee register={register} formState={formState} watch={watch} />}
+                  {activeStep.id === 'nominee' && <Step1Nominee register={register} formState={formState} watch={watch} setValue={setValue} />}
                   {activeStep.id === 'professional' && <Step2Professional register={register} formState={formState} watch={watch} />}
                   {activeStep.id === 'category' && <Step3Category watch={watch} setValue={setValue} register={register} formState={formState} />}
                   {activeStep.id === 'categoryDetails' && <Step4CategoryDetails register={register} formState={formState} watch={watch} setValue={setValue} />}
