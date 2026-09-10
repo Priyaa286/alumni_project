@@ -10,9 +10,13 @@ const authRoutes = require('./routes/authRoutes');
 const memberRoutes = require('./routes/memberRoutes');
 const otpRoutes = require('./routes/otpRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
+const { verifySMTPConnection } = require('./utils/sendEmail');
 
 // Initialize database connection
 connectDB();
+
+// Verify SMTP connection on startup
+verifySMTPConnection();
 
 const app = express();
 
