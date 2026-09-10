@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, Component } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Award, Calendar, Mail, Phone, Eye, Search, Filter, 
-  Clock, FileText, RefreshCw, X, GraduationCap, Trophy, Medal, UserCheck, Layers, AlertTriangle
+  Clock, FileText, RefreshCw, X, GraduationCap, Trophy, Medal, UserCheck, Layers, AlertTriangle, CheckCircle2, XCircle, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { getAllNominations } from '../services/api';
@@ -115,101 +116,27 @@ const getNominatorContact = (item) => {
 };
 
 const AdminResponsesContent = () => {
+  const navigate = useNavigate();
   const [nominations, setNominations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedBatch, setSelectedBatch] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedNomination, setSelectedNomination] = useState(null);
-
-  const MOCK_FALLBACK_NOMINATIONS = [
-    {
-      _id: 'mock_101',
-      nominationId: 'NOM-2026-0001',
-      category: 'Scientific',
-      status: 'Submitted',
-      createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-      nominee: {
-        name: 'Dr. A. R. Sundaram',
-        batch: '2008',
-        department: 'Computer Science & Engineering',
-        designation: 'Principal AI Researcher',
-        organization: 'DeepMind Robotics',
-        email: 'sundaram.ar@example.com',
-        mobile: '+91 98765 43210'
-      },
-      nominator: {
-        name: 'Prof. K. Subramanian',
-        email: 'subramanian.k@nec.edu',
-        mobile: '+91 94431 12345'
-      },
-      accomplishments: 'Pioneered breakthroughs in neural network optimization for medical imaging algorithms, published over 40 high-impact papers, and holds 6 international patents.',
-      contributionsToNEC: 'Guest speaker for annual alumni tech symposium and established research scholarship fund for underprivileged engineering students.'
-    },
-    {
-      _id: 'mock_102',
-      nominationId: 'NOM-2026-0002',
-      category: 'Business',
-      status: 'Submitted',
-      createdAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-      nominee: {
-        name: 'Priya Venkatesh',
-        batch: '2012',
-        department: 'Information Technology',
-        designation: 'Founder & CEO',
-        organization: 'EcoGrid Tech Solutions',
-        email: 'priya.v@ecogridtech.com',
-        mobile: '+91 98123 76543'
-      },
-      nominator: {
-        name: 'Rajesh Kumar',
-        email: 'rajesh.k@ecogridtech.com',
-        mobile: '+91 98989 12345'
-      },
-      accomplishments: 'Built a clean-tech startup valued at $50M that provides smart solar microgrids across rural South India, empowering 500+ villages.',
-      contributionsToNEC: 'Provides campus recruitment opportunities and sponsors NEC Innovation Incubator lab.'
-    },
-    {
-      _id: 'mock_103',
-      nominationId: 'NOM-2026-0003',
-      category: 'Social',
-      status: 'Submitted',
-      createdAt: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-      nominee: {
-        name: 'Captain M. Ramesh',
-        batch: '2001',
-        department: 'Mechanical Engineering',
-        designation: 'Director of Operations',
-        organization: 'Asha Rural Foundation',
-        email: 'm.ramesh@ashafoundation.org',
-        mobile: '+91 97711 22334'
-      },
-      nominator: {
-        name: 'Dr. V. Meenakshi',
-        email: 'meenakshi.v@nec.edu',
-        mobile: '+91 94422 99887'
-      },
-      accomplishments: 'Leads disaster relief operations and clean drinking water initiatives across flood-prone regions, benefitting over 100,000 households.',
-      contributionsToNEC: 'Key organizer for NEC Alumni Benevolent Fund and mentor for student NSS chapter.'
-    }
-  ];
 
   const fetchNominations = async () => {
     setLoading(true);
     try {
       const res = await getAllNominations();
       if (res && res.success && Array.isArray(res.data)) {
-        if (res.data.length > 0) {
-          setNominations(res.data);
-        } else {
-          setNominations(MOCK_FALLBACK_NOMINATIONS);
-        }
+        setNominations(res.data);
       } else {
-        setNominations(MOCK_FALLBACK_NOMINATIONS);
+        setNominations([]);
       }
     } catch (err) {
-      console.warn('Backend API unavailable, displaying demo nomination responses:', err);
-      setNominations(MOCK_FALLBACK_NOMINATIONS);
+      console.warn('Backend API error or empty responses:', err);
+      setNominations([]);
     } finally {
       setLoading(false);
     }
@@ -235,7 +162,7 @@ const AdminResponsesContent = () => {
     return Array.from(map.values());
   }, [nominations]);
 
-  // Compute Unique Categories and Batches
+  // Compute Unique Categories, Batches, and Statuses
   const categories = useMemo(() => {
     const set = new Set();
     safeNominations.forEach((n) => {
@@ -253,7 +180,9 @@ const AdminResponsesContent = () => {
     return ['All', ...Array.from(set).sort()];
   }, [safeNominations]);
 
-  // Filter nominations based on search, category, and batch
+  const statuses = ['All', 'Not Verified', 'Approved', 'Rejected'];
+
+  // Filter nominations based on search, category, batch, and status
   const filteredNominations = useMemo(() => {
     return safeNominations.filter((item) => {
       if (!item) return false;
@@ -263,6 +192,7 @@ const AdminResponsesContent = () => {
       const batch = getNomineeBatch(item);
       const dept = getNomineeDepartment(item);
       const nomId = ensureString(item.nominationId);
+      const vStatus = item.verificationStatus || 'Not Verified';
 
       const query = (searchTerm || '').toLowerCase();
       const matchesSearch =
@@ -275,17 +205,18 @@ const AdminResponsesContent = () => {
 
       const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
       const matchesBatch = selectedBatch === 'All' || batch === selectedBatch;
+      const matchesStatus = selectedStatus === 'All' || vStatus === selectedStatus;
 
-      return matchesSearch && matchesCategory && matchesBatch;
+      return matchesSearch && matchesCategory && matchesBatch && matchesStatus;
     });
-  }, [safeNominations, searchTerm, selectedCategory, selectedBatch]);
+  }, [safeNominations, searchTerm, selectedCategory, selectedBatch, selectedStatus]);
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
       {/* Main Section: Search, Filters & Responses Table */}
       <div className="w-full space-y-6">
-        {/* Controls Bar: Search, Category & Batch Filters */}
+        {/* Controls Bar: Search, Category, Batch & Status Filters */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Search */}
           <div className="relative w-full sm:w-72">
@@ -299,8 +230,24 @@ const AdminResponsesContent = () => {
             />
           </div>
 
-          {/* Category & Batch Filters & Refresh */}
+          {/* Category, Batch, Status Filters & Refresh */}
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            {/* Status Filter */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-bold">
+              <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 bg-white"
+              >
+                {statuses.map((st) => (
+                  <option key={st} value={st}>
+                    Status: {st}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Category Filter */}
             <div className="flex items-center gap-1.5 text-xs text-slate-600 font-bold">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -333,6 +280,15 @@ const AdminResponsesContent = () => {
               </select>
             </div>
 
+            {/* Leaderboard Shortcut */}
+            <button
+              onClick={() => navigate('/leaderboard')}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              <span>Leaderboard</span>
+            </button>
+
             {/* Refresh Button */}
             <button
               onClick={fetchNominations}
@@ -355,22 +311,22 @@ const AdminResponsesContent = () => {
             <div className="p-12 text-center text-slate-500 space-y-2">
               <FileText className="w-12 h-12 text-slate-300 mx-auto" />
               <p className="text-base font-bold text-slate-700">No Nominations Found</p>
-              <p className="text-xs text-slate-400">Try adjusting your search query, batch, or category filter.</p>
+              <p className="text-xs text-slate-400">There are currently no submitted nominations in the system.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto w-full">
-              <table className="w-full text-left border-collapse min-w-[850px]">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] uppercase tracking-wider font-extrabold text-slate-500">
-                    <th className="py-4 px-6 whitespace-nowrap">ID & Date</th>
-                    <th className="py-4 px-6 min-w-[200px]">Nominee Name</th>
-                    <th className="py-4 px-6 whitespace-nowrap">Award Category</th>
-                    <th className="py-4 px-6 whitespace-nowrap">Nominator</th>
-                    <th className="py-4 px-6 whitespace-nowrap">Contact Info</th>
-                    <th className="py-4 px-6 text-right whitespace-nowrap">Actions</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">ID & Date</th>
+                    <th className="py-3.5 px-4">Nominee Name</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Verification Tag</th>
+                    <th className="py-3.5 px-4">Nominator</th>
+                    <th className="py-3.5 px-4">Contact Info</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
+                <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
                   {filteredNominations.map((item) => {
                     const nomineeName = getNomineeName(item);
                     const nomineeBatch = getNomineeBatch(item);
@@ -379,6 +335,8 @@ const AdminResponsesContent = () => {
                     const nomineeMobile = ensureString(item.nominee?.mobile || item.mobile, 'N/A');
                     const nominatorName = getNominatorName(item);
                     const nominatorContact = getNominatorContact(item);
+                    const vStatus = item.verificationStatus || 'Not Verified';
+
                     const dateStr = item.createdAt
                       ? new Date(item.createdAt).toLocaleDateString('en-US', {
                           month: 'short',
@@ -390,50 +348,62 @@ const AdminResponsesContent = () => {
                     return (
                       <tr key={item._id || item.nominationId} className="hover:bg-purple-50/30 transition-colors">
                         {/* ID & Date */}
-                        <td className="py-4 px-6 font-mono text-xs text-slate-500 whitespace-nowrap">
+                        <td className="py-3.5 px-4 font-mono text-xs text-slate-500 whitespace-nowrap">
                           <span className="font-bold text-primary block">{ensureString(item.nominationId)}</span>
                           <span className="text-[11px] text-slate-400">{dateStr}</span>
                         </td>
 
                         {/* Nominee Name & Batch */}
-                        <td className="py-4 px-6">
-                          <div className="font-bold text-slate-900 whitespace-nowrap">{nomineeName}</div>
-                          <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900">{nomineeName}</div>
+                          <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                             {nomineeBatch !== 'N/A' && (
-                              <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                              <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[10px]">
                                 Batch {nomineeBatch}
                               </span>
                             )}
-                            {nomineeDept && <span>• {nomineeDept}</span>}
+                            {nomineeDept && <span className="truncate max-w-[200px]">• {nomineeDept}</span>}
                           </div>
                         </td>
 
-                        {/* Award Category */}
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-                            <Award className="w-3.5 h-3.5" />
-                            {ensureString(item.category, 'General')}
-                          </span>
+                        {/* Verification Tag (Approved / Rejected / Not Verified) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {vStatus === 'Approved' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Approved
+                            </span>
+                          ) : vStatus === 'Rejected' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              Rejected
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              Not Verified
+                            </span>
+                          )}
                         </td>
 
                         {/* Nominator */}
-                        <td className="py-4 px-6 whitespace-nowrap">
+                        <td className="py-3.5 px-4">
                           <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                            <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                            {nominatorName}
+                            <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[150px]">{nominatorName}</span>
                           </div>
                           {nominatorContact !== 'N/A' && (
-                            <div className="text-[11px] text-slate-400 truncate max-w-[180px]">
+                            <div className="text-[11px] text-slate-400 truncate max-w-[150px]">
                               {nominatorContact}
                             </div>
                           )}
                         </td>
 
                         {/* Contact Info */}
-                        <td className="py-4 px-6 text-xs text-slate-600 space-y-0.5 whitespace-nowrap">
+                        <td className="py-3.5 px-4 text-xs text-slate-600 space-y-0.5">
                           <div className="flex items-center gap-1.5">
                             <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{nomineeEmail}</span>
+                            <span className="truncate max-w-[180px]">{nomineeEmail}</span>
                           </div>
                           {nomineeMobile !== 'N/A' && (
                             <div className="flex items-center gap-1.5">
@@ -444,13 +414,13 @@ const AdminResponsesContent = () => {
                         </td>
 
                         {/* Actions */}
-                        <td className="py-4 px-6 text-right whitespace-nowrap">
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <button
-                            onClick={() => setSelectedNomination(item)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-primary hover:text-white text-slate-700 text-xs font-bold transition-all duration-200 cursor-pointer shadow-sm"
+                            onClick={() => navigate(`/admin/verify/${item._id || item.nominationId}`)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white hover:bg-primary/90 text-xs font-bold transition-all duration-200 cursor-pointer shadow-sm"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>View Details</span>
+                            <span>View & Verify</span>
                           </button>
                         </td>
                       </tr>

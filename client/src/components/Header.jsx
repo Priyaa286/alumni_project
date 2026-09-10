@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LogOut, ShieldCheck, LayoutDashboard, FileText } from 'lucide-react';
+import { LogOut, ShieldCheck, LayoutDashboard, FileText, Trophy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
@@ -48,6 +48,15 @@ const Header = () => {
               className="h-12 md:h-14 w-auto object-contain transition-transform duration-300 hover:scale-105"
             />
           </div>
+
+          {/* Leaderboard Link Button */}
+          <Link
+            to="/leaderboard"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300 transition-colors shadow-sm"
+          >
+            <Trophy className="w-4 h-4 text-amber-600" />
+            <span>Leaderboard</span>
+          </Link>
 
           {/* User Auth Indicator & Navigation Buttons */}
           {isAuthenticated && user ? (

@@ -11,6 +11,10 @@ router.delete('/nominations/:id', nominationController.deleteNomination);
 
 // Admin Routes (Protected by Authorization Middleware)
 router.get('/admin/nominations', verifyAdmin, nominationController.getAllNominations);
+router.put('/admin/nominations/:id/verify', verifyAdmin, nominationController.verifyNomination);
+
+// Public Leaderboard Route
+router.get('/leaderboard', nominationController.getLeaderboard);
 
 // Category List Route
 router.get('/categories', nominationController.getCategories);

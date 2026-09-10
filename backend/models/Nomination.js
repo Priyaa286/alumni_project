@@ -66,11 +66,28 @@ const NominationSchema = new mongoose.Schema({
     nomineeName: { type: String, required: true },
     date: { type: Date, required: true },
     place: { type: String, required: true },
-    signature: { type: String, required: true } // Base64 data URL representing the signature
+    isOtpVerified: { type: Boolean, default: false },
+    signature: { type: String } // Retained as optional for backward compatibility
+  },
+  verificationStatus: {
+    type: String,
+    enum: ['Not Verified', 'Approved', 'Rejected'],
+    default: 'Not Verified'
+  },
+  rejectionReason: {
+    type: String,
+    default: ''
+  },
+  verifiedDocuments: [{
+    type: String
+  }],
+  score: {
+    type: Number,
+    default: 0
   },
   status: {
     type: String,
-    enum: ['Draft', 'Submitted'],
+    enum: ['Draft', 'Submitted', 'Under Review', 'Approved', 'Rejected'],
     default: 'Submitted'
   }
 }, {

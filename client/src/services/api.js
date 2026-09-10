@@ -75,6 +75,26 @@ export const lookupMemberByEmail = async (email) => {
   return response.data;
 };
 
+export const sendOtp = async (email) => {
+  const response = await API.post('/api/otp/send-otp', { email });
+  return response.data;
+};
+
+export const verifyOtp = async (email, otp) => {
+  const response = await API.post('/api/otp/verify-otp', { email, otp });
+  return response.data;
+};
+
+export const verifyNomination = async (id, data) => {
+  const response = await API.put(`/api/admin/nominations/${id}/verify`, data);
+  return response.data;
+};
+
+export const getLeaderboard = async () => {
+  const response = await API.get('/api/leaderboard');
+  return response.data;
+};
+
 export default {
   loginUser,
   getAllNominations,
@@ -84,5 +104,9 @@ export default {
   getCategories,
   uploadFile,
   lookupMemberByEmail,
+  sendOtp,
+  verifyOtp,
+  verifyNomination,
+  getLeaderboard,
 };
 
