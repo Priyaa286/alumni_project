@@ -8,8 +8,8 @@ const Header = () => {
   const location = useLocation();
 
   return (
-    <header className="w-full glass-panel sticky top-0 z-50 px-4 py-3 md:px-8 md:py-4 shadow-premium border-b border-borderlight bg-white/90 backdrop-blur-md">
-      <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <header className="w-full glass-panel sticky top-0 z-50 py-3 shadow-premium border-b border-borderlight bg-white/95 backdrop-blur-md">
+      <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 flex flex-col md:flex-row items-center justify-between gap-4">
         
         {/* Left: National Engineering College Logo */}
         <div className="flex items-center gap-3">
@@ -79,22 +79,12 @@ const Header = () => {
                 </Link>
               )}
 
-              <div className="hidden lg:block text-right">
-                <span className="text-xs font-bold text-slate-800 block truncate max-w-[120px]">
-                  {user.name || user.email}
-                </span>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
-                  {user.role}
-                </span>
-              </div>
-
               <button
                 onClick={logout}
                 title="Logout"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           ) : (

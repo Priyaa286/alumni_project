@@ -336,7 +336,7 @@ const NominationForm = () => {
   const activeStep = activeSteps[currentStep - 1] || activeSteps[0];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 md:px-8">
+    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       {/* ProgressBar */}
       <ProgressBar currentStep={currentStep} totalSteps={activeSteps.length} />
 

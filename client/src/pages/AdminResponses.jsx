@@ -212,7 +212,7 @@ const AdminResponsesContent = () => {
   }, [safeNominations, searchTerm, selectedCategory, selectedBatch, selectedStatus]);
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-6 space-y-6">
 
       {/* Main Section: Search, Filters & Responses Table */}
       <div className="w-full space-y-6">

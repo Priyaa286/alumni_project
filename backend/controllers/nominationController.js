@@ -1,6 +1,7 @@
 const Nomination = require('../models/Nomination');
 const Counter = require('../models/Counter');
 const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
 
 // In-Memory Storage Fallback (used when local MongoDB server is not running)
 const inMemoryNominations = new Map();
