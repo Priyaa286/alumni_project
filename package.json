@@ -10,6 +10,7 @@
     "start": "npm --prefix backend start"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "react-router-dom": "^7.18.2"
   }
 }

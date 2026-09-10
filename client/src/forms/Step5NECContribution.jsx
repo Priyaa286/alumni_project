@@ -149,49 +149,11 @@ const Step5NECContribution = ({ register, formState: { errors }, watch, setValue
               Provide detailed information about contributions to National Engineering College & Alumni Association.
             </p>
           </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => loadNomineeRecords(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors shadow-sm"
-              title="Reload institutional data for this nominee"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Reload Nominee Data
-            </button>
-            <button
-              type="button"
-              onClick={handleAutoGenerateSummary}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-colors shadow-sm"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Auto-generate Summary
-            </button>
-          </div>
+          
         </div>
       </div>
 
-      {/* Auto-Fetched Records Banner (Dynamically changes for Self vs Nominate Others) */}
-      <div className="p-4 rounded-nec bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border border-purple-200/80 shadow-sm flex items-start gap-3">
-        <div className="p-2 rounded-xl bg-primary text-white shrink-0 mt-0.5">
-          <Database className="w-5 h-5" />
-        </div>
-        <div className="flex-1 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-heading font-extrabold text-slate-800 text-sm">
-              Institutional Portal Records Loaded for {nomineeName || 'Nominee'}
-            </span>
-            <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold text-[10px] flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              {nominationType === 'others' ? 'Nominate Others Mode' : 'Self Nomination Mode'}
-            </span>
-          </div>
-          <p className="text-slate-600 mt-1 leading-relaxed">
-            Verified institutional contribution records for <strong className="text-primary">{nomineeName || 'the nominee'}</strong> ({nomineeDept || 'NEC Alumni'}) have been auto-fetched from college databases. Pre-checked options and details below are customizable.
-          </p>
-        </div>
-      </div>
-
+      
       {/* Checkboxes List with Dynamic Fetched Metric Badges */}
       <div className="flex flex-col gap-2">
         <label className="text-sm font-bold text-slate-700 mb-2">
