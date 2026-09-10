@@ -124,25 +124,12 @@ export const generateAcknowledgementPDF = (data) => {
   }
 
   // Declaration Section
-  drawSectionHeader('5. Declaration & Signature');
+  drawSectionHeader('5. Declaration & Email OTP Verification');
   drawRow('Signee Name:', declaration.nomineeName, 'Place:', declaration.place);
   drawRow('Declaration Date:', declaration.date || new Date().toLocaleDateString(), '', '');
   
-  y += 10;
-  doc.setFont('Helvetica', 'bold');
-  doc.text('Signature Verification:', 20, y);
-
-  // Render Signature Image in PDF if available
-  if (declaration.signature) {
-    try {
-      doc.addImage(declaration.signature, 'PNG', 20, y + 3, 50, 20);
-    } catch (e) {
-      console.error('Failed to embed signature into PDF:', e);
-      doc.text('[Digital Signature Captured]', 20, y + 10);
-    }
-  } else {
-    doc.text('Not Signed', 20, y + 10);
-  }
+  y += 5;
+  drawRow('Email Verification:', declaration.isOtpVerified ? 'Verified via Nominee Email' : 'Pending', 'Nominee Email:', nominee.email || 'N/A');
 
   // Footer Branding Note
   doc.setFontSize(8);

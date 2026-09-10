@@ -4,9 +4,9 @@ const nodemailer = require('nodemailer');
  * Check if required SMTP credentials are present in environment variables
  */
 const isSMTPConfigured = () => {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const host = process.env.SMTP_HOST || (process.env.GMAIL_USER ? 'smtp.gmail.com' : null);
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_PASS;
   return Boolean(host && user && pass);
 };
 
@@ -14,11 +14,11 @@ const isSMTPConfigured = () => {
  * Create Nodemailer SMTP transporter using existing environment variables
  */
 const createTransporter = () => {
-  const host = process.env.SMTP_HOST;
+  const host = process.env.SMTP_HOST || (process.env.GMAIL_USER ? 'smtp.gmail.com' : null);
   const port = process.env.SMTP_PORT || 587;
   const secure = process.env.SMTP_SECURE === 'true' || Number(port) === 465;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_PASS;
 
   if (!host || !user || !pass) {
     return null;

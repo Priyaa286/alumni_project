@@ -135,10 +135,11 @@ exports.getNominationById = async (req, res) => {
     let nomination = null;
 
     if (mongoose.connection.readyState === 1) {
-      if (id.startsWith('NOM-')) {
-        nomination = await Nomination.findOne({ nominationId: id });
-      } else {
+      if (mongoose.Types.ObjectId.isValid(id)) {
         nomination = await Nomination.findById(id);
+      }
+      if (!nomination) {
+        nomination = await Nomination.findOne({ nominationId: id });
       }
     } else {
       nomination = inMemoryNominations.get(id) || null;
@@ -171,7 +172,12 @@ exports.updateNomination = async (req, res) => {
     let nomination = null;
 
     if (mongoose.connection.readyState === 1) {
-      nomination = await Nomination.findById(id) || await Nomination.findOne({ nominationId: id });
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        nomination = await Nomination.findById(id);
+      }
+      if (!nomination) {
+        nomination = await Nomination.findOne({ nominationId: id });
+      }
       if (!nomination) {
         return res.status(404).json({ success: false, message: 'Nomination not found' });
       }
@@ -209,7 +215,13 @@ exports.deleteNomination = async (req, res) => {
     const { id } = req.params;
 
     if (mongoose.connection.readyState === 1) {
-      let nomination = await Nomination.findById(id) || await Nomination.findOne({ nominationId: id });
+      let nomination = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        nomination = await Nomination.findById(id);
+      }
+      if (!nomination) {
+        nomination = await Nomination.findOne({ nominationId: id });
+      }
       if (!nomination) {
         return res.status(404).json({ success: false, message: 'Nomination not found' });
       }
@@ -284,97 +296,311 @@ exports.getAllNominations = async (req, res) => {
       }
     });
 
-    nominations = Array.from(map.values());
+    const nominations = Array.from(map.values());
 
-    // Default Mock Nominations if database is empty
-    if (!nominations || nominations.length === 0) {
-      nominations = [
-        {
-          _id: 'mock_101',
-          nominationId: 'NOM-2026-0001',
-          category: 'Scientific',
-          status: 'Submitted',
-          createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-          nominee: {
-            fullName: 'Dr. A. R. Sundaram',
-            degree: 'B.E. Computer Science',
-            graduationYear: '2008',
-            designation: 'Principal AI Researcher',
-            organization: 'DeepMind Robotics',
-            email: 'sundaram.ar@example.com',
-            mobile: '+91 98765 43210'
-          },
-          nominator: {
-            fullName: 'Prof. K. Subramanian',
-            relationToNominee: 'Former Professor & HOD',
-            email: 'subramanian.k@nec.edu',
-            mobile: '+91 94431 12345'
-          },
-          accomplishments: 'Pioneered breakthroughs in neural network optimization for medical imaging algorithms, published over 40 high-impact papers, and holds 6 international patents.',
-          contributionsToNEC: 'Guest speaker for annual alumni tech symposium and established research scholarship fund for underprivileged engineering students.'
-        },
-        {
-          _id: 'mock_102',
-          nominationId: 'NOM-2026-0002',
-          category: 'Business',
-          status: 'Under Review',
-          createdAt: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-          nominee: {
-            fullName: 'Priya Venkatesh',
-            degree: 'B.Tech Information Technology',
-            graduationYear: '2012',
-            designation: 'Founder & CEO',
-            organization: 'EcoGrid Tech Solutions',
-            email: 'priya.v@ecogridtech.com',
-            mobile: '+91 98123 76543'
-          },
-          nominator: {
-            fullName: 'Rajesh Kumar',
-            relationToNominee: 'Batchmate & Co-founder',
-            email: 'rajesh.k@ecogridtech.com',
-            mobile: '+91 98989 12345'
-          },
-          accomplishments: 'Built a clean-tech startup valued at $50M that provides smart solar microgrids across rural South India, empowering 500+ villages.',
-          contributionsToNEC: 'Provides campus recruitment opportunities and sponsors NEC Innovation Incubator lab.'
-        },
-        {
-          _id: 'mock_103',
-          nominationId: 'NOM-2026-0003',
-          category: 'Social',
-          status: 'Approved',
-          createdAt: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-          nominee: {
-            fullName: 'Captain M. Ramesh',
-            degree: 'B.E. Mechanical Engineering',
-            graduationYear: '2001',
-            designation: 'Director of Operations',
-            organization: 'Asha Rural Foundation',
-            email: 'm.ramesh@ashafoundation.org',
-            mobile: '+91 97711 22334'
-          },
-          nominator: {
-            fullName: 'Dr. V. Meenakshi',
-            relationToNominee: 'Alumni Association Member',
-            email: 'meenakshi.v@nec.edu',
-            mobile: '+91 94422 99887'
-          },
-          accomplishments: 'Leads disaster relief operations and clean drinking water initiatives across flood-prone regions, benefitting over 100,000 households.',
-          contributionsToNEC: 'Key organizer for NEC Alumni Benevolent Fund and mentor for student NSS chapter.'
-        }
-      ];
-    }
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: nominations.length,
       data: nominations
     });
   } catch (error) {
-    console.error('Error fetching all nominations:', error);
-    res.status(500).json({
+    console.error('Error fetching nominations:', error);
+    return res.status(500).json({
       success: false,
       message: 'Failed to retrieve nominations'
     });
   }
 };
+
+// Helper to calculate score for Leaderboard ranking
+const calculateNomineeScore = (data) => {
+  let score = 0;
+  // 1. Contribution activities count (25 pts per activity)
+  const activities = data.necContribution?.activities || [];
+  score += activities.length * 25;
+
+  // 2. Additional contribution details length bonus
+  const details = data.necContribution?.details || '';
+  if (details.length > 50) score += 15;
+  if (details.length > 150) score += 15;
+
+  // 3. Work Experience (5 pts per year, max 100 pts)
+  const expStr = data.professional?.experience || '0';
+  const expYears = parseInt(expStr, 10);
+  if (!isNaN(expYears)) {
+    score += Math.min(expYears * 5, 100);
+  }
+
+  // 4. Verified Documents bonus (15 pts per verified doc)
+  const verifiedDocs = data.verifiedDocuments || [];
+  score += verifiedDocs.length * 15;
+
+  // 5. Registered Alumni Bonus (20 pts)
+  if (data.nominee?.isRegisteredAlumni === 'Yes') {
+    score += 20;
+  }
+
+  return score;
+};
+
+// Helper to send decision email notification
+const sendDecisionEmail = async (nomineeEmail, nomineeName, decision, rejectionReason = '') => {
+  if (!nomineeEmail) return;
+
+  try {
+    let transporter = null;
+    let from = `"NEC Alumni Association" <no-reply@nec.edu.in>`;
+
+    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+      const gmailUser = process.env.GMAIL_USER.trim();
+      const gmailPass = process.env.GMAIL_PASS.replace(/\s+/g, '');
+      transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user: gmailUser, pass: gmailPass },
+      });
+      from = `"NEC Alumni Association" <${gmailUser}>`;
+    } else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST.trim(),
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: { user: process.env.SMTP_USER.trim(), pass: process.env.SMTP_PASS.trim() },
+      });
+      from = process.env.SMTP_FROM || `"NEC Alumni Association" <${process.env.SMTP_USER.trim()}>`;
+    }
+
+    if (!transporter) {
+      console.log(`[DECISION MAIL LOG] Mail for: ${nomineeEmail} | Decision: ${decision}`);
+      return;
+    }
+
+    if (decision === 'Approved') {
+      await transporter.sendMail({
+        from,
+        to: nomineeEmail,
+        subject: 'Congratulations! Your Details Verified - NEC Notable Alumni Award',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #8A2BE2; text-align: center; margin-bottom: 8px;">NATIONAL ENGINEERING COLLEGE</h2>
+            <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 0;">NOTABLE ALUMNI AWARD PORTAL</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 16px; color: #1e293b;">Dear <strong>${nomineeName}</strong>,</p>
+            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #166534; margin: 0 0 8px 0; font-size: 16px;">🎉 Nomination Details Verified & Approved!</h3>
+              <p style="color: #15803d; font-size: 14px; margin: 0; line-height: 1.5;">
+                Your details are successfully verified and You're eligible for ranking in the Notable Alumni Award Leaderboard!
+              </p>
+            </div>
+            <p style="font-size: 14px; color: #475569;">
+              Thank you for your outstanding professional accomplishments and invaluable contributions to National Engineering College.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #94a3b8; text-align: center;">
+              National Engineering College, K.R. Nagar, Kovilpatti - 628 503
+            </p>
+          </div>
+        `,
+      });
+      console.log(`[APPROVAL EMAIL SENT] Sent approval email to ${nomineeEmail}`);
+    } else if (decision === 'Rejected') {
+      await transporter.sendMail({
+        from,
+        to: nomineeEmail,
+        subject: 'Update on Your Nomination - NEC Notable Alumni Award',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #8A2BE2; text-align: center; margin-bottom: 8px;">NATIONAL ENGINEERING COLLEGE</h2>
+            <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 0;">NOTABLE ALUMNI AWARD PORTAL</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 16px; color: #1e293b;">Dear <strong>${nomineeName}</strong>,</p>
+            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+              Thank you for submitting your nomination details for the Notable Alumni Award.
+            </p>
+            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+              After careful review of your submitted documents and records, we regret to inform you that your nomination could not be approved at this time.
+            </p>
+            <div style="background-color: #fff1f2; border: 1px solid #fecdd3; padding: 16px; border-radius: 8px; margin: 20px 0;">
+              <h4 style="color: #9f1239; margin: 0 0 6px 0; font-size: 14px;">Reason for Rejection / Disqualification:</h4>
+              <p style="color: #be123c; font-size: 13px; margin: 0; font-weight: 600;">
+                ${rejectionReason || 'Submitted documents or details could not be verified against the official records.'}
+              </p>
+            </div>
+            <p style="font-size: 14px; color: #475569;">
+              We sincerely appreciate your participation and continued engagement with National Engineering College.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #94a3b8; text-align: center;">
+              National Engineering College, K.R. Nagar, Kovilpatti - 628 503
+            </p>
+          </div>
+        `,
+      });
+      console.log(`[REJECTION EMAIL SENT] Sent rejection email to ${nomineeEmail}`);
+    }
+  } catch (err) {
+    console.error('Error sending decision email:', err);
+  }
+};
+
+// Admin Verify Endpoint (Approve / Reject)
+exports.verifyNomination = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { verificationStatus, rejectionReason, verifiedDocuments } = req.body;
+
+    if (!['Approved', 'Rejected'].includes(verificationStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'verificationStatus must be Approved or Rejected'
+      });
+    }
+
+    let updatedItem = null;
+
+    if (mongoose.connection.readyState === 1) {
+      let nomination = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        nomination = await Nomination.findById(id);
+      }
+      if (!nomination) {
+        nomination = await Nomination.findOne({ nominationId: id });
+      }
+
+      if (nomination) {
+        nomination.verificationStatus = verificationStatus;
+        nomination.status = verificationStatus;
+        nomination.rejectionReason = rejectionReason || '';
+        nomination.verifiedDocuments = verifiedDocuments || [];
+        nomination.score = calculateNomineeScore(nomination);
+        updatedItem = await nomination.save();
+        inMemoryNominations.set(String(updatedItem._id), updatedItem.toObject());
+        if (updatedItem.nominationId) {
+          inMemoryNominations.set(updatedItem.nominationId, updatedItem.toObject());
+        }
+      }
+    }
+
+    if (!updatedItem) {
+      // In-Memory map lookup
+      let item = inMemoryNominations.get(id);
+      if (!item) {
+        for (const [k, v] of inMemoryNominations.entries()) {
+          if (v._id === id || v.nominationId === id) {
+            item = v;
+            break;
+          }
+        }
+      }
+
+      if (item) {
+        item.verificationStatus = verificationStatus;
+        item.status = verificationStatus;
+        item.rejectionReason = rejectionReason || '';
+        item.verifiedDocuments = verifiedDocuments || [];
+        item.score = calculateNomineeScore(item);
+        item.updatedAt = new Date().toISOString();
+        inMemoryNominations.set(id, item);
+        if (item._id) inMemoryNominations.set(String(item._id), item);
+        if (item.nominationId) inMemoryNominations.set(item.nominationId, item);
+        updatedItem = item;
+      }
+    }
+
+    if (!updatedItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Nomination not found'
+      });
+    }
+
+    // Trigger real-time email notification (non-blocking)
+    const recipientEmail = updatedItem.nominee?.email || updatedItem.email || updatedItem.nominator?.email;
+    const nomineeName = updatedItem.nominee?.name || updatedItem.nominee?.fullName || updatedItem.nomineeName || 'Alumni';
+
+    sendDecisionEmail(recipientEmail, nomineeName, verificationStatus, rejectionReason).catch(err => {
+      console.error('Non-blocking decision email warning:', err);
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Nomination marked as ${verificationStatus} and email notification triggered.`,
+      data: updatedItem
+    });
+  } catch (error) {
+    console.error('Error verifying nomination:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update verification status: ' + (error.message || error)
+    });
+  }
+};
+
+// Leaderboard Endpoint - Returns ranked approved candidates
+exports.getLeaderboard = async (req, res) => {
+  try {
+    let approvedItems = [];
+
+    if (mongoose.connection.readyState === 1) {
+      approvedItems = await Nomination.find({
+        $or: [
+          { verificationStatus: 'Approved' },
+          { status: 'Approved' }
+        ]
+      }).lean();
+    }
+
+    // Merge in-memory approved items as well
+    const memMap = new Map();
+    approvedItems.forEach(item => {
+      if (item) {
+        const key = item.nominationId || String(item._id);
+        memMap.set(key, item);
+      }
+    });
+
+    for (const item of inMemoryNominations.values()) {
+      if (!item) continue;
+      if (item.verificationStatus === 'Approved' || item.status === 'Approved') {
+        const key = item.nominationId || String(item._id);
+        if (!memMap.has(key)) {
+          memMap.set(key, item);
+        }
+      }
+    }
+
+    const allApproved = Array.from(memMap.values());
+
+    // Calculate score & sort by score descending
+    const scoredList = allApproved.map((item) => {
+      const computedScore = item.score && item.score > 0 ? item.score : calculateNomineeScore(item);
+      return {
+        ...item,
+        score: computedScore
+      };
+    });
+
+    scoredList.sort((a, b) => b.score - a.score);
+
+    // Assign rank 1, 2, 3...
+    const leaderboard = scoredList.map((item, index) => ({
+      rank: index + 1,
+      ...item
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: leaderboard.length,
+      data: leaderboard
+    });
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve leaderboard'
+    });
+  }
+};
+
 

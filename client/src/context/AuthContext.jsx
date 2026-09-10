@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
 
     try {
-      // 1. Try Firebase Popup Authentication
+      // 1. Try Firebase Popup Authentication if configured
       if (auth && googleProvider) {
         try {
           const result = await signInWithPopup(auth, googleProvider);
@@ -133,15 +133,15 @@ export const AuthProvider = ({ children }) => {
           saveAuthSession(fallbackUser);
           return { success: true, user: fallbackUser };
         } catch (popupErr) {
-          console.warn('Firebase popup closed/not configured, using interactive Google fallback prompt:', popupErr.message);
+          console.warn('Firebase popup notice:', popupErr.message);
         }
       }
 
       // 2. Interactive Google Account Email Prompt for Demo/Development Environments
-      const userGoogleEmail = window.prompt('Enter your Google Account Email ID for authentication:');
+      const userGoogleEmail = window.prompt('Enter your Google Email ID to sign in:');
       if (!userGoogleEmail || !userGoogleEmail.trim()) {
         setLoading(false);
-        return { success: false, message: 'Google Sign-In was cancelled.' };
+        return { success: false, message: '' }; // Clean cancellation without red error banner
       }
 
       const cleanEmail = userGoogleEmail.trim().toLowerCase();

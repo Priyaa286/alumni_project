@@ -5,6 +5,8 @@ import Header from './components/Header';
 import Login from './pages/Login';
 import NominationForm from './pages/NominationForm';
 import AdminResponses from './pages/AdminResponses';
+import NomineeVerification from './pages/NomineeVerification';
+import Leaderboard from './pages/Leaderboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -35,6 +37,9 @@ function AppContent() {
           <Route path="/" element={<NominationForm />} />
           <Route path="/nomination" element={<NominationForm />} />
 
+          {/* Public Leaderboard Route */}
+          <Route path="/leaderboard" element={<Leaderboard />} />
+
           {/* Admin Login Route */}
           <Route path="/login" element={<Login />} />
 
@@ -44,6 +49,16 @@ function AppContent() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminResponses />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Nominee Document Verification & Approval Route (Protected - Admin Only) */}
+          <Route
+            path="/admin/verify/:id"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <NomineeVerification />
               </ProtectedRoute>
             }
           />
