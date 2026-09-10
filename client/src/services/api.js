@@ -27,8 +27,18 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
-export const loginUser = async (email, password) => {
-  const response = await API.post('/api/auth/login', { email, password });
+export const sendOTP = async (email) => {
+  const response = await API.post('/api/auth/send-otp', { email });
+  return response.data;
+};
+
+export const verifyOTP = async (email, otp) => {
+  const response = await API.post('/api/auth/verify-otp', { email, otp });
+  return response.data;
+};
+
+export const googleAuthUser = async (googleData) => {
+  const response = await API.post('/api/auth/google', googleData);
   return response.data;
 };
 
@@ -76,7 +86,9 @@ export const lookupMemberByEmail = async (email) => {
 };
 
 export default {
-  loginUser,
+  sendOTP,
+  verifyOTP,
+  googleAuthUser,
   getAllNominations,
   submitNomination,
   getNomination,
@@ -85,4 +97,3 @@ export default {
   uploadFile,
   lookupMemberByEmail,
 };
-
