@@ -63,9 +63,11 @@ const EMPTY_FORM_VALUES = {
     designation: ''
   },
   declaration: {
-    agreed: false,
-    signatureName: '',
-    date: ''
+    isDeclared: false,
+    nomineeName: '',
+    date: '',
+    place: '',
+    isOtpVerified: false
   }
 };
 
@@ -133,7 +135,7 @@ const NominationForm = () => {
       component: Step8Declaration, 
       fields: [
         'declaration.isDeclared', 'declaration.nomineeName', 
-        'declaration.date', 'declaration.place', 'declaration.signature'
+        'declaration.date', 'declaration.place', 'declaration.isOtpVerified'
       ] 
     });
     list.push({ id: 'review', label: 'Review', component: Step9Review, fields: [] });
@@ -258,7 +260,7 @@ const NominationForm = () => {
         );
       case 'declaration':
         const decl = formValues.declaration || {};
-        return decl.isDeclared && decl.nomineeName && decl.date && decl.place && decl.signature;
+        return decl.isDeclared && decl.nomineeName && decl.date && decl.place && decl.isOtpVerified;
       case 'review':
       case 'submit':
         return true;
@@ -365,7 +367,7 @@ const NominationForm = () => {
                   {activeStep.id === 'necContribution' && <Step5NECContribution register={register} formState={formState} watch={watch} setValue={setValue} />}
                   {activeStep.id === 'documents' && <Step6Documents watch={watch} setValue={setValue} />}
                   {activeStep.id === 'nominator' && <Step7Nominator register={register} formState={formState} />}
-                  {activeStep.id === 'declaration' && <Step8Declaration register={register} control={control} formState={formState} />}
+                  {activeStep.id === 'declaration' && <Step8Declaration register={register} watch={watch} setValue={setValue} formState={formState} />}
                   {activeStep.id === 'review' && <Step9Review watch={watch} onEditStep={handleEditStep} />}
                   {activeStep.id === 'submit' && (
                     <Step10Submission
