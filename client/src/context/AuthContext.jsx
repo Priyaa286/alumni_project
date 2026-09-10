@@ -5,6 +5,8 @@ import { auth, googleProvider, signInWithPopup } from '../config/firebase';
 
 const AuthContext = createContext(null);
 
+const ONE_HOUR_MS = 60 * 60 * 1000; // 1 hour session expiration
+
 export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState(() => {
     const saved = localStorage.getItem('auth_user');
@@ -12,11 +14,20 @@ export const AuthProvider = ({ children }) => {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.isAuthenticated && parsed.user) {
-          return {
-            isAuthenticated: true,
-            user: parsed.user,
-            token: parsed.token || `auth-token-${parsed.user.role}-${Date.now()}`,
-          };
+          // Check if 1-hour session has expired
+          if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+            console.log('Session expired (1 hour limit reached). Logging out.');
+            localStorage.removeItem('auth_user');
+          } else {
+            const cleanEmail = (parsed.user.email || '').trim().toLowerCase();
+            const computedRole = isAdminEmail(cleanEmail) ? 'admin' : (parsed.user.role || 'user');
+            return {
+              isAuthenticated: true,
+              user: { ...parsed.user, role: computedRole },
+              token: parsed.token || `auth-token-${computedRole}-${Date.now()}`,
+              expiresAt: parsed.expiresAt || (Date.now() + ONE_HOUR_MS),
+            };
+          }
         }
       } catch (e) {
         console.error('Failed to parse saved authentication state:', e);
@@ -27,17 +38,40 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: false,
       user: null,
       token: null,
+      expiresAt: null,
     };
   });
 
   const [loading, setLoading] = useState(false);
 
+  // Auto logout after 1 hour session duration
+  useEffect(() => {
+    if (authState.isAuthenticated && authState.expiresAt) {
+      const timeRemaining = authState.expiresAt - Date.now();
+      if (timeRemaining <= 0) {
+        logout();
+      } else {
+        const timer = setTimeout(() => {
+          console.log('1 hour session limit reached. Auto logging out...');
+          logout();
+        }, timeRemaining);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [authState.isAuthenticated, authState.expiresAt]);
+
   // Helper to persist auth session
   const saveAuthSession = (user, token) => {
+    const cleanEmail = (user.email || '').trim().toLowerCase();
+    const computedRole = isAdminEmail(cleanEmail) ? 'admin' : (user.role || 'user');
+    const updatedUser = { ...user, role: computedRole };
+    const expiresAt = Date.now() + ONE_HOUR_MS;
+
     const newState = {
       isAuthenticated: true,
-      user,
-      token: token || `auth-token-${user.role}-${Date.now()}`,
+      user: updatedUser,
+      token: token || `auth-token-${computedRole}-${Date.now()}`,
+      expiresAt,
     };
     setAuthState(newState);
     localStorage.setItem('auth_user', JSON.stringify(newState));
@@ -75,9 +109,15 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const res = await verifyOtpApi(cleanEmail, inputOtp);
-      if (res.success && res.user) {
-        saveAuthSession(res.user, res.token);
-        return { success: true, user: res.user };
+      if (res.success) {
+        const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
+        const userObj = res.user || {
+          name: cleanEmail.split('@')[0],
+          email: cleanEmail,
+          role: computedRole,
+        };
+        saveAuthSession(userObj, res.token);
+        return { success: true, user: userObj };
       } else {
         return { success: false, message: res.message || 'Verification failed.' };
       }

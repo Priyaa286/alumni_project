@@ -33,8 +33,8 @@ function AppContent() {
       {/* Main Content Area with Client Routing */}
       <main className="flex-grow w-full py-4">
         <Routes>
-          {/* Public Nomination Form Route (Default landing page) */}
-          <Route path="/" element={<NominationForm />} />
+          {/* Default landing page route (Login) */}
+          <Route path="/" element={<Login />} />
           <Route path="/nomination" element={<NominationForm />} />
 
           {/* Public Leaderboard Route */}

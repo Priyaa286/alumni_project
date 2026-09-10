@@ -9,8 +9,8 @@ const ADMIN_EMAILS = [
   'admin@nec.edu',
   'principal@nec.edu',
   'alumni@nec.edu',
-  // Add your email address here, e.g.:
-  // 'your-email@gmail.com',
+  'praga007thija@gmail.com',
+  'm.priyadharshini286@gmail.com',
 ];
 
 /**

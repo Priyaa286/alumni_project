@@ -5,6 +5,8 @@ import { Mail, ArrowRight, ShieldCheck, AlertCircle, ArrowLeft, RefreshCw, Check
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
+import { isAdminEmail } from '../config/adminList';
+
 const Login = () => {
   const navigate = useNavigate();
   const { requestOtp, verifyOtpCode, isAuthenticated, user, loading: authLoading } = useAuth();
@@ -28,7 +30,7 @@ const Login = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === 'admin') {
+      if (user.role === 'admin' || isAdminEmail(user.email)) {
         navigate('/admin/responses', { replace: true });
       } else {
         navigate('/nomination', { replace: true });
@@ -345,23 +347,7 @@ const Login = () => {
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Admin Configuration Note */}
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <div className="p-3 rounded-xl bg-purple-50/80 border border-purple-200/80 text-xs text-slate-700 space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-primary">
-                <FileCode className="w-4 h-4 shrink-0" />
-                <span>Admin Role Assignment</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-tight">
-                Any valid email can log in. Admin privileges are automatically assigned to emails configured in:
-                <br />
-                <code className="bg-white px-1.5 py-0.5 rounded border border-purple-200 font-mono text-primary font-semibold text-[10px] block mt-1 truncate">
-                  alumni_project/backend/config/adminList.js
-                </code>
-              </p>
-            </div>
-          </div>
+          
         </div>
       </motion.div>
     </div>

@@ -146,8 +146,8 @@ const NomineeVerification = () => {
       if (res && res.success) {
         toast.success(
           verificationStatus === 'Approved'
-            ? "Nominee verified & approved successfully! Real-time approval email sent."
-            : "Nomination rejected and rejection notification sent to nominee."
+            ? "Email send for successful verification"
+            : "Email send for rejected nomination"
         );
         setIsRejectModalOpen(false);
         fetchNominationData();
@@ -163,7 +163,7 @@ const NomineeVerification = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-8 space-y-8">
       
       {/* Header Bar */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

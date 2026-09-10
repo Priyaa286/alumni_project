@@ -186,6 +186,8 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
+const { isAdminEmail } = require('../config/adminList');
+
 // Verify OTP controller
 exports.verifyOtp = async (req, res) => {
   try {
@@ -227,9 +229,18 @@ exports.verifyOtp = async (req, res) => {
     storedRecord.verified = true;
     otpStore.set(cleanEmail, storedRecord);
 
+    const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
+    const userObj = {
+      name: cleanEmail.split('@')[0],
+      email: cleanEmail,
+      role: computedRole,
+    };
+
     return res.status(200).json({
       success: true,
       message: 'Email address verified successfully!',
+      user: userObj,
+      token: `auth-token-${computedRole}-${Date.now()}`,
     });
   } catch (error) {
     console.error('Error in verifyOtp:', error);
