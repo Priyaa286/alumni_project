@@ -47,6 +47,11 @@ export const getAllNominations = async () => {
   return response.data;
 };
 
+export const sendNominationInvitations = async () => {
+  const response = await API.post('/api/admin/nomination-invitations');
+  return response.data;
+};
+
 export const submitNomination = async (data) => {
   const response = await API.post('/api/nominations', data);
   return response.data;
@@ -110,6 +115,7 @@ export default {
   verifyOTP,
   googleAuthUser,
   getAllNominations,
+  sendNominationInvitations,
   submitNomination,
   getNomination,
   updateNomination,

@@ -3,6 +3,7 @@ const User = require('../models/User');
 const OTP = require('../models/OTP');
 const { isAdminEmail, ADMIN_EMAILS } = require('../config/adminList');
 const { sendOTPEmail } = require('../utils/sendEmail');
+const { createAdminToken } = require('../utils/adminAuth');
 
 // In-Memory Fallback OTP Storage for high reliability (stores hashed OTP)
 const memoryOtpStore = new Map();
@@ -34,6 +35,13 @@ exports.sendOTP = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Please enter a valid email format (e.g., user@example.com).',
+      });
+    }
+
+    if (!isAdminEmail(cleanEmail)) {
+      return res.status(403).json({
+        success: false,
+        message: 'This is an admin-only login. Alumni can open the nomination form directly from their email link.',
       });
     }
 
@@ -102,6 +110,9 @@ exports.verifyOTP = async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    if (!isAdminEmail(cleanEmail)) {
+      return res.status(403).json({ success: false, message: 'This is an admin-only login.' });
+    }
     const inputHashedOtp = hashOtp(otp);
 
     let isValid = false;
@@ -159,8 +170,7 @@ exports.verifyOTP = async (req, res) => {
       // Ignore delete errors
     }
 
-    // Determine Role Automatically (Admin if listed in adminList, else User)
-    const role = isAdminEmail(cleanEmail) ? 'admin' : 'user';
+    const role = 'admin';
 
     // Retrieve or create User in MongoDB
     let userObj = null;
@@ -194,7 +204,7 @@ exports.verifyOTP = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: `Authenticated successfully as ${role.toUpperCase()}.`,
-      token: `auth-token-${role}-${Date.now()}`,
+      token: createAdminToken(cleanEmail),
       user: userData,
     });
   } catch (error) {
@@ -221,9 +231,10 @@ exports.googleAuth = async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    
-    // Automatically determine role based on configuration
-    const role = isAdminEmail(cleanEmail) ? 'admin' : 'user';
+    if (!isAdminEmail(cleanEmail)) {
+      return res.status(403).json({ success: false, message: 'This Google account is not the configured admin account.' });
+    }
+    const role = 'admin';
 
     // Upsert user in database if MongoDB is available
     let userObj = null;
@@ -246,7 +257,7 @@ exports.googleAuth = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: `Signed in with Google successfully as ${role.toUpperCase()}.`,
-      token: `google-token-${role}-${Date.now()}`,
+      token: createAdminToken(cleanEmail),
       user: {
         id: userObj ? userObj._id : googleId || Date.now().toString(),
         name: name || (userObj ? userObj.name : cleanEmail.split('@')[0]),

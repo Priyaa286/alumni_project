@@ -6,7 +6,7 @@ import {
   Clock, FileText, RefreshCw, X, GraduationCap, Trophy, Medal, UserCheck, Layers, AlertTriangle, CheckCircle2, XCircle, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { getAllNominations } from '../services/api';
+import { getAllNominations, sendNominationInvitations } from '../services/api';
 
 // Error Boundary Component to prevent Blank Page crashes
 class AdminResponsesErrorBoundary extends Component {
@@ -124,6 +124,21 @@ const AdminResponsesContent = () => {
   const [selectedBatch, setSelectedBatch] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedNomination, setSelectedNomination] = useState(null);
+  const [sendingInvitations, setSendingInvitations] = useState(false);
+
+  const handleSendInvitations = async () => {
+    if (!window.confirm('Send the direct nomination-form link to every alumni email address in the database?')) return;
+    setSendingInvitations(true);
+    try {
+      const result = await sendNominationInvitations();
+      toast.success(result.message);
+      if (result.failed?.length) toast.warning(`${result.failed.length} invitation(s) could not be delivered.`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to send nomination invitations.');
+    } finally {
+      setSendingInvitations(false);
+    }
+  };
 
   const fetchNominations = async () => {
     setLoading(true);
@@ -281,6 +296,15 @@ const AdminResponsesContent = () => {
             </div>
 
             {/* Leaderboard Shortcut */}
+            <button
+              onClick={handleSendInvitations}
+              disabled={sendingInvitations}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-60 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>{sendingInvitations ? 'Sending links...' : 'Email form link to alumni'}</span>
+            </button>
+
             <button
               onClick={() => navigate('/leaderboard')}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"

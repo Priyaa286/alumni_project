@@ -1,14 +1,13 @@
-// Middleware to verify authorization header / role for admin endpoints
+const { isAdminEmail } = require('../config/adminList');
+const { verifyAdminToken } = require('../utils/adminAuth');
 
 exports.verifyAdmin = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const userRoleHeader = req.headers['x-user-role'];
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const session = verifyAdminToken(token);
 
-  // Check Bearer token or x-user-role header for demo role validation
-  if (
-    (authHeader && authHeader.includes('admin')) ||
-    userRoleHeader === 'admin'
-  ) {
+  if (session && isAdminEmail(session.email)) {
+    req.admin = session;
     return next();
   }
 

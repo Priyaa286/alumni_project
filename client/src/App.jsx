@@ -33,8 +33,8 @@ function AppContent() {
       {/* Main Content Area with Client Routing */}
       <main className="flex-grow w-full py-4">
         <Routes>
-          {/* Default landing page route (Login) */}
-          <Route path="/" element={<Login />} />
+          {/* Alumni form is public and can be opened directly from its email link. */}
+          <Route path="/" element={<Navigate to="/nomination" replace />} />
           <Route path="/nomination" element={<NominationForm />} />
 
           {/* Public Leaderboard Route */}
@@ -63,8 +63,7 @@ function AppContent() {
             }
           />
 
-          {/* Default Redirect to Nomination Form */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/nomination" replace />} />
         </Routes>
       </main>
 

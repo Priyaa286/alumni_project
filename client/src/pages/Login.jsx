@@ -5,7 +5,6 @@ import { Mail, ArrowRight, ShieldCheck, AlertCircle, ArrowLeft, RefreshCw, Check
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
-import { isAdminEmail } from '../config/adminList';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -30,7 +29,7 @@ const Login = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === 'admin' || isAdminEmail(user.email)) {
+      if (user.role === 'admin') {
         navigate('/admin/responses', { replace: true });
       } else {
         navigate('/nomination', { replace: true });
@@ -184,10 +183,10 @@ const Login = () => {
               <ShieldCheck className="w-7 h-7" />
             </div>
             <h2 className="font-heading font-extrabold text-2xl text-slate-900 tracking-tight">
-              Portal Access
+              Admin Access
             </h2>
             <p className="text-xs font-medium text-slate-500 mt-1">
-              National Engineering College Alumni Association
+              Enter the configured administrator email to continue.
             </p>
           </div>
 
@@ -218,7 +217,7 @@ const Login = () => {
                 <form onSubmit={handleSendOtp} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Email Address
+                      Administrator Email
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -251,7 +250,7 @@ const Login = () => {
                       </>
                     ) : (
                       <>
-                        <span>Send 6-Digit OTP Code</span>
+                        <span>Send Admin OTP Code</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}

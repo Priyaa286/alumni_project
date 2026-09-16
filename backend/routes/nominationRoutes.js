@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const nominationController = require('../controllers/nominationController');
 const { verifyAdmin } = require('../middleware/authMiddleware');
+const invitationController = require('../controllers/invitationController');
 
 // Nomination Form Routes
 router.post('/nominations', nominationController.createNomination);
@@ -12,6 +13,7 @@ router.delete('/nominations/:id', nominationController.deleteNomination);
 // Admin Routes (Protected by Authorization Middleware)
 router.get('/admin/nominations', verifyAdmin, nominationController.getAllNominations);
 router.put('/admin/nominations/:id/verify', verifyAdmin, nominationController.verifyNomination);
+router.post('/admin/nomination-invitations', verifyAdmin, invitationController.sendNominationInvitations);
 
 // Public Leaderboard Route
 router.get('/leaderboard', nominationController.getLeaderboard);

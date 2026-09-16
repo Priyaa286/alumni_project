@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { sendOTP as sendOtpApi, verifyOTP as verifyOtpApi, googleAuthUser as googleAuthApi } from '../services/api';
-import { isAdminEmail } from '../config/adminList';
 import { auth, googleProvider, signInWithPopup } from '../config/firebase';
 
 const AuthContext = createContext(null);
@@ -19,8 +18,7 @@ export const AuthProvider = ({ children }) => {
             console.log('Session expired (1 hour limit reached). Logging out.');
             localStorage.removeItem('auth_user');
           } else {
-            const cleanEmail = (parsed.user.email || '').trim().toLowerCase();
-            const computedRole = isAdminEmail(cleanEmail) ? 'admin' : (parsed.user.role || 'user');
+            const computedRole = parsed.user.role === 'admin' ? 'admin' : 'user';
             return {
               isAuthenticated: true,
               user: { ...parsed.user, role: computedRole },
@@ -62,8 +60,7 @@ export const AuthProvider = ({ children }) => {
 
   // Helper to persist auth session
   const saveAuthSession = (user, token) => {
-    const cleanEmail = (user.email || '').trim().toLowerCase();
-    const computedRole = isAdminEmail(cleanEmail) ? 'admin' : (user.role || 'user');
+    const computedRole = user.role === 'admin' ? 'admin' : 'user';
     const updatedUser = { ...user, role: computedRole };
     const expiresAt = Date.now() + ONE_HOUR_MS;
 
@@ -110,7 +107,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await verifyOtpApi(cleanEmail, inputOtp);
       if (res.success) {
-        const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
+        const computedRole = res.user?.role === 'admin' ? 'admin' : 'user';
         const userObj = res.user || {
           name: cleanEmail.split('@')[0],
           email: cleanEmail,
@@ -161,7 +158,8 @@ export const AuthProvider = ({ children }) => {
             console.warn('Backend sync failed after Google auth, using Firebase payload:', backendErr);
           }
 
-          const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
+          // A failed server sync must not create an admin session in the browser.
+          const computedRole = 'user';
           const fallbackUser = {
             name: googleData.name,
             email: googleData.email,
@@ -185,7 +183,8 @@ export const AuthProvider = ({ children }) => {
       }
 
       const cleanEmail = userGoogleEmail.trim().toLowerCase();
-      const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
+      // The server is authoritative; this fallback cannot create an admin session.
+      const computedRole = 'user';
 
       const userName = cleanEmail.split('@')[0].replace(/[._]/g, ' ');
       const formattedName = userName.charAt(0).toUpperCase() + userName.slice(1);

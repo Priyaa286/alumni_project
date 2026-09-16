@@ -1,9 +1,8 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, FileText, Trophy } from 'lucide-react';
+import { LogOut, LayoutDashboard, FileText, Trophy, ShieldCheck } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
-import { isAdminEmail } from '../config/adminList';
 
 const Header = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -12,7 +11,7 @@ const Header = () => {
 
   // Check authentication & admin status
   const isLoggedIn = Boolean(isAuthenticated && user);
-  const isAdmin = isLoggedIn && (user?.role === 'admin' || isAdminEmail(user?.email));
+  const isAdmin = isLoggedIn && user?.role === 'admin';
 
   const handleLogout = () => {
     logout();
@@ -104,6 +103,15 @@ const Header = () => {
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Logout</span>
             </button>
+          )}
+          {!isLoggedIn && (
+            <Link
+              to="/login"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-primary text-xs font-bold border border-primary/20 transition-colors shadow-sm"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Admin Access</span>
+            </Link>
           )}
         </div>
         

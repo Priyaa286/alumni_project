@@ -54,6 +54,41 @@ const loadMembersJson = () => {
   return membersEmailMap;
 };
 
+// Collect every distinct email known to the locally indexed alumni export and,
+// when connected, the members collection. The export is retained as a fallback
+// for development environments where MongoDB is unavailable.
+exports.getAllMemberEmails = async () => {
+  const emails = new Set(loadMembersJson().keys());
+
+  if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    try {
+      const cursor = mongoose.connection.db.collection('members').find({}, {
+        projection: {
+          'basic.email_id': 1,
+          'basic.alternate_email_id': 1,
+          'contact_details.email': 1,
+          'contact_details.email_id': 1,
+        },
+      });
+      for await (const member of cursor) {
+        [
+          member.basic?.email_id,
+          member.basic?.alternate_email_id,
+          member.contact_details?.email,
+          member.contact_details?.email_id,
+        ].filter(Boolean).forEach((email) => {
+          const cleanEmail = String(email).trim().toLowerCase();
+          if (cleanEmail && cleanEmail !== 'null' && cleanEmail !== 'undefined') emails.add(cleanEmail);
+        });
+      }
+    } catch (error) {
+      console.warn('[Member Invitations] MongoDB email collection warning:', error.message);
+    }
+  }
+
+  return Array.from(emails);
+};
+
 // Pre-load on startup
 loadMembersJson();
 

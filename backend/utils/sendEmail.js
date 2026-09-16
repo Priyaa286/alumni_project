@@ -137,9 +137,30 @@ NEC Alumni Portal`;
   }
 };
 
+const sendNominationInvitation = async (to, formUrl) => {
+  const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Alumni Portal <alumni@nec.edu>';
+  if (!isSMTPConfigured()) return { sent: false, reason: 'SMTP email credentials not configured.' };
+  try {
+    const transporter = createTransporter();
+    const safeUrl = String(formUrl).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const info = await transporter.sendMail({
+      from,
+      to,
+      subject: 'Submit your Notable Alumni Award nomination',
+      text: `You can submit a nomination directly using this link: ${formUrl}\n\nNo login or OTP is required.\n\nRegards,\nNEC Alumni Association`,
+      html: `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:600px;margin:auto"><h2>NEC Alumni Association</h2><p>You are invited to submit a Notable Alumni Award nomination.</p><p><a href="${safeUrl}" style="display:inline-block;padding:12px 18px;background:#6b21a8;color:#fff;text-decoration:none;border-radius:6px;font-weight:700">Open nomination form</a></p><p>This link opens the form directly; no login or OTP is required.</p></div>`,
+    });
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`[SMTP ERROR]: Failed to send nomination invitation to ${to}:`, error.message);
+    return { sent: false, error: error.message };
+  }
+};
+
 module.exports = {
   isSMTPConfigured,
   verifySMTPConnection,
   sendOTPEmail,
+  sendNominationInvitation,
 };
 
