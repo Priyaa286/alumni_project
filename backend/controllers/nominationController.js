@@ -1,16 +1,36 @@
 const Nomination = require('../models/Nomination');
 const Counter = require('../models/Counter');
+const Setting = require('../models/Setting');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
+const { sendNominationFormOpenEmail } = require('../utils/sendEmail');
 
 // In-Memory Storage Fallback (used when local MongoDB server is not running)
 const inMemoryNominations = new Map();
 let inMemorySeq = 0;
+let inMemoryFormOpen = true; // Default form open status
 
 // Create a new Nomination
 exports.createNomination = async (req, res) => {
   try {
+    // Check if Nomination Form is Open
+    let isOpen = inMemoryFormOpen;
+    if (mongoose.connection.readyState === 1) {
+      const formSetting = await Setting.findOne({ key: 'nomination_form_open' });
+      if (formSetting !== null && formSetting !== undefined) {
+        isOpen = Boolean(formSetting.value);
+      }
+    }
+
+    if (!isOpen) {
+      return res.status(403).json({
+        success: false,
+        message: 'The nomination form is currently closed by the Admin. Submissions are no longer accepted.'
+      });
+    }
+
     const nomineeEmail = (req.body.nominee?.email || req.body.email || '').trim().toLowerCase();
+
     const nomineeMobile = (req.body.nominee?.mobile || req.body.mobile || '').trim();
     const nomineeName = (req.body.nominee?.name || req.body.nominee?.fullName || req.body.nomineeName || '').trim().toLowerCase();
 
@@ -603,5 +623,74 @@ exports.getLeaderboard = async (req, res) => {
     });
   }
 };
+
+// Get Nomination Form Opening/Closing Status (Public)
+exports.getNominationStatus = async (req, res) => {
+  try {
+    let isOpen = inMemoryFormOpen;
+    if (mongoose.connection.readyState === 1) {
+      const setting = await Setting.findOne({ key: 'nomination_form_open' });
+      if (setting !== null && setting !== undefined) {
+        isOpen = Boolean(setting.value);
+      }
+    }
+    return res.status(200).json({
+      success: true,
+      isOpen
+    });
+  } catch (error) {
+    console.error('Error fetching nomination status:', error);
+    return res.status(500).json({
+      success: false,
+      isOpen: inMemoryFormOpen,
+      message: 'Failed to fetch nomination status'
+    });
+  }
+};
+
+// Toggle Nomination Form Opening/Closing Status (Admin Only)
+exports.toggleNominationStatus = async (req, res) => {
+  try {
+    const { isOpen } = req.body;
+    const targetStatus = Boolean(isOpen);
+    inMemoryFormOpen = targetStatus;
+
+    if (mongoose.connection.readyState === 1) {
+      await Setting.findOneAndUpdate(
+        { key: 'nomination_form_open' },
+        { value: targetStatus },
+        { upsert: true, new: true }
+      );
+    }
+
+    let emailResult = null;
+    // If Admin opens the nomination form, send email notification to praga007thija@gmail.com
+    if (targetStatus) {
+      const origin = req.headers.origin || req.headers.referer || 'http://localhost:5173';
+      const cleanOrigin = origin.replace(/\/$/, '');
+      const formUrl = `${cleanOrigin}/nomination`;
+      
+      const recipientEmail = 'praga007thija@gmail.com';
+      console.log(`[Admin Action] Opening Nomination Form and sending announcement email to ${recipientEmail} with form URL: ${formUrl}`);
+      emailResult = await sendNominationFormOpenEmail(recipientEmail, formUrl);
+    }
+
+    return res.status(200).json({
+      success: true,
+      isOpen: targetStatus,
+      emailResult,
+      message: targetStatus
+        ? `Nomination form opened successfully.${emailResult?.sent ? ' Email notification sent to praga007thija@gmail.com.' : ' Email notification triggered.'}`
+        : 'Nomination form closed successfully. The form link is now deactivated for new submissions.'
+    });
+  } catch (error) {
+    console.error('Error toggling nomination status:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update nomination status'
+    });
+  }
+};
+
 
 

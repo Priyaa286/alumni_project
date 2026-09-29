@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Award, Calendar, Mail, Phone, Eye, Search, Filter, 
-  Clock, FileText, RefreshCw, X, GraduationCap, Trophy, Medal, UserCheck, Layers, AlertTriangle, CheckCircle2, XCircle, ShieldCheck
+  Clock, FileText, RefreshCw, X, GraduationCap, Trophy, Medal, UserCheck, Layers, AlertTriangle, CheckCircle2, XCircle, ShieldCheck, Lock, Unlock
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { getAllNominations } from '../services/api';
+import { getAllNominations, getNominationStatus, toggleNominationStatus } from '../services/api';
+
 
 // Error Boundary Component to prevent Blank Page crashes
 class AdminResponsesErrorBoundary extends Component {
@@ -124,6 +125,45 @@ const AdminResponsesContent = () => {
   const [selectedBatch, setSelectedBatch] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedNomination, setSelectedNomination] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(true);
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  const fetchFormStatus = async () => {
+    try {
+      const res = await getNominationStatus();
+      if (res && typeof res.isOpen === 'boolean') {
+        setIsFormOpen(res.isOpen);
+      }
+    } catch (err) {
+      console.error('Failed to fetch nomination status:', err);
+    }
+  };
+
+  const handleToggleFormStatus = async () => {
+    const nextStatus = !isFormOpen;
+    const actionText = nextStatus ? 'OPEN' : 'CLOSE';
+    const confirmMsg = nextStatus
+      ? 'Are you sure you want to OPEN the nomination form?\nAn email notification containing the form link will be sent to praga007thija@gmail.com for testing.'
+      : 'Are you sure you want to CLOSE the nomination form?\nThe nomination link will be deactivated and no further submissions will be accepted.';
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setTogglingStatus(true);
+    try {
+      const res = await toggleNominationStatus(nextStatus);
+      if (res && res.success) {
+        setIsFormOpen(res.isOpen);
+        toast.success(res.message || `Nomination form ${actionText}ED successfully!`);
+      } else {
+        toast.error(res?.message || `Failed to ${actionText.toLowerCase()} nomination form.`);
+      }
+    } catch (err) {
+      console.error('Error toggling nomination form status:', error);
+      toast.error(err.response?.data?.message || `Failed to update form status.`);
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
 
   const fetchNominations = async () => {
     setLoading(true);
@@ -144,7 +184,9 @@ const AdminResponsesContent = () => {
 
   useEffect(() => {
     fetchNominations();
+    fetchFormStatus();
   }, []);
+
 
   // Safe Deduplicated Nominations list
   const safeNominations = useMemo(() => {
@@ -214,8 +256,60 @@ const AdminResponsesContent = () => {
   return (
     <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-6 space-y-6">
 
+      {/* Admin Nomination Form Status & Control Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 rounded-2xl p-5 text-white shadow-xl border border-purple-500/20 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className={`p-3.5 rounded-2xl border ${isFormOpen ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'}`}>
+            {isFormOpen ? <Unlock className="w-7 h-7" /> : <Lock className="w-7 h-7" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-lg font-bold text-white">Nomination Form Control</h2>
+              <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider border ${isFormOpen ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'}`}>
+                {isFormOpen ? '● Form Status: OPEN' : '● Form Status: CLOSED'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1">
+              {isFormOpen
+                ? 'The nomination form link is currently OPEN and active. Alumni can submit nominations.'
+                : 'The nomination form link is CLOSED and deactivated. No further submissions are accepted.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+          <button
+            onClick={handleToggleFormStatus}
+            disabled={togglingStatus}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center gap-2 cursor-pointer ${
+              isFormOpen
+                ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-900/30'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/30'
+            } disabled:opacity-50`}
+          >
+            {togglingStatus ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Updating Status...</span>
+              </>
+            ) : isFormOpen ? (
+              <>
+                <Lock className="w-4 h-4" />
+                <span>Close Nomination Form</span>
+              </>
+            ) : (
+              <>
+                <Unlock className="w-4 h-4" />
+                <span>Open Nomination Form & Send Email</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* Main Section: Search, Filters & Responses Table */}
       <div className="w-full space-y-6">
+
         {/* Controls Bar: Search, Category, Batch & Status Filters */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Search */}

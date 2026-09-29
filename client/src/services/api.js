@@ -105,6 +105,16 @@ export const getLeaderboard = async () => {
   return response.data;
 };
 
+export const getNominationStatus = async () => {
+  const response = await API.get('/api/nomination-status');
+  return response.data;
+};
+
+export const toggleNominationStatus = async (isOpen) => {
+  const response = await API.post('/api/admin/nomination-status', { isOpen });
+  return response.data;
+};
+
 export default {
   sendOTP,
   verifyOTP,
@@ -120,4 +130,7 @@ export default {
   verifyOtp,
   verifyNomination,
   getLeaderboard,
+  getNominationStatus,
+  toggleNominationStatus,
 };
+

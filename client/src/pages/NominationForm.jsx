@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { ArrowLeft, ArrowRight, Save, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, RotateCcw, Lock } from 'lucide-react';
 
 import ProgressBar from '../components/ProgressBar';
 import Sidebar from '../components/Sidebar';
@@ -17,7 +17,8 @@ import Step8Declaration from '../forms/Step8Declaration';
 import Step9Review from '../forms/Step9Review';
 import Step10Submission from '../forms/Step10Submission';
 
-import { submitNomination } from '../services/api';
+import { submitNomination, getNominationStatus } from '../services/api';
+
 
 const LOCAL_STORAGE_KEY = 'nec_nomination_draft';
 
@@ -75,8 +76,27 @@ const NominationForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(true);
+  const [checkingStatus, setCheckingStatus] = useState(true);
+
+  useEffect(() => {
+    const checkFormStatus = async () => {
+      try {
+        const res = await getNominationStatus();
+        if (res && typeof res.isOpen === 'boolean') {
+          setIsFormOpen(res.isOpen);
+        }
+      } catch (err) {
+        console.error('Failed to check nomination form status:', err);
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+    checkFormStatus();
+  }, []);
 
   // Load saved draft values from local storage, or fallback to empty structure
+
   const [defaultValues] = useState(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -335,7 +355,53 @@ const NominationForm = () => {
 
   const activeStep = activeSteps[currentStep - 1] || activeSteps[0];
 
+  if (!checkingStatus && !isFormOpen) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center space-y-6">
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-10 border border-slate-200/80 shadow-2xl space-y-6">
+          <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-3xl mx-auto flex items-center justify-center shadow-lg border border-rose-200">
+            <Lock className="w-10 h-10" />
+          </div>
+          <div className="space-y-2">
+            <span className="px-4 py-1.5 rounded-full text-xs font-black bg-rose-100 text-rose-700 uppercase tracking-widest border border-rose-200 inline-block">
+              Submissions Closed
+            </span>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+              Nomination Form is Currently Closed
+            </h1>
+            <p className="text-slate-600 text-sm max-w-xl mx-auto leading-relaxed">
+              The Distinguished Alumni Award Nomination Form is currently deactivated by the Administrator. 
+              No new submissions are being accepted at this time.
+            </p>
+          </div>
+
+          <div className="p-4 bg-purple-50/60 border border-purple-200/60 rounded-2xl max-w-lg mx-auto text-xs text-slate-700 space-y-1">
+            <p className="font-semibold text-purple-900">National Engineering College Alumni Association</p>
+            <p>If you have any queries, please contact the Alumni Association office or administrators.</p>
+          </div>
+
+          <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 rounded-2xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Refresh Status</span>
+            </button>
+            <a
+              href="/leaderboard"
+              className="px-6 py-3 rounded-2xl bg-primary text-white font-bold text-xs hover:bg-primary/90 transition-all shadow-md flex items-center gap-2"
+            >
+              <span>View Leaderboard</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
+
     <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       {/* ProgressBar */}
       <ProgressBar currentStep={currentStep} totalSteps={activeSteps.length} />
