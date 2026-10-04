@@ -6,17 +6,10 @@ require('dotenv').config();
 const connectDB = require('./config/db');
 const nominationRoutes = require('./routes/nominationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
-const authRoutes = require('./routes/authRoutes');
-const memberRoutes = require('./routes/memberRoutes');
-const otpRoutes = require('./routes/otpRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
-const { verifySMTPConnection } = require('./utils/sendEmail');
 
 // Initialize database connection
 connectDB();
-
-// Verify SMTP connection on startup
-verifySMTPConnection();
 
 const app = express();
 
@@ -24,7 +17,7 @@ const app = express();
 app.use(cors({
   origin: '*', // For development flexibility
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-role']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '15mb' })); // Support larger JSON payloads (signature canvas and text data)
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
@@ -33,11 +26,8 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
-app.use('/api', authRoutes);
 app.use('/api', nominationRoutes);
 app.use('/api', uploadRoutes);
-app.use('/api', memberRoutes);
-app.use('/api/otp', otpRoutes);
 
 // Root route placeholder
 app.get('/', (req, res) => {
