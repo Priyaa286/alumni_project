@@ -1,0 +1,16 @@
+{
+  "name": "alumni-project-root",
+  "version": "1.0.0",
+  "description": "NEC Alumni Award Portal Root Configuration",
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "dev:client": "npm --prefix client run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix backend start"
+  },
+  "dependencies": {
+    "firebase": "^12.19.0",
+    "react-router-dom": "^7.18.2"
+  }
+}
