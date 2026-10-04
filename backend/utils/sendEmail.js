@@ -226,11 +226,31 @@ National Engineering College, Kovilpatti`;
   }
 };
 
+const sendNomineeApprovalEmail = async (to, nomineeName, nominationId, approvalUrl) => {
+  const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Alumni Portal <alumni@nec.edu>';
+  const transporter = createTransporter();
+  if (!transporter) return { sent: false, reason: 'SMTP credentials are not configured.' };
+  try {
+    await transporter.sendMail({
+      from,
+      to,
+      subject: 'Please review your NEC Alumni Award nomination',
+      text: `Hello ${nomineeName},\n\nThe NEC Alumni Association office has prepared nomination ${nominationId} for you. Please review and approve or decline it using this secure link (valid for 7 days):\n${approvalUrl}\n\nRegards,\nNEC Alumni Association`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#1e293b"><h2>NEC Alumni Award nomination</h2><p>Hello ${String(nomineeName).replace(/[&<>"']/g, '')},</p><p>The Alumni Association office has prepared nomination <strong>${String(nominationId).replace(/[&<>"']/g, '')}</strong> for you. Please review and approve or decline the nomination.</p><p><a href="${approvalUrl}" style="display:inline-block;padding:12px 18px;background:#6b21a8;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold">Review nomination</a></p><p>This secure link expires in 7 days and can be used once.</p><p>Regards,<br/>NEC Alumni Association</p></div>`,
+    });
+    return { sent: true };
+  } catch (error) {
+    console.error('[SMTP ERROR] Nominee approval email failed:', error.message);
+    return { sent: false, reason: error.message };
+  }
+};
+
 module.exports = {
   isSMTPConfigured,
   verifySMTPConnection,
   sendOTPEmail,
   sendNominationFormOpenEmail,
+  sendNomineeApprovalEmail,
 };
 
 

@@ -17,9 +17,6 @@ API.interceptors.request.use((config) => {
       if (parsed.token) {
         config.headers.Authorization = `Bearer ${parsed.token}`;
       }
-      if (parsed.user?.role) {
-        config.headers['x-user-role'] = parsed.user.role;
-      }
     } catch (e) {
       console.error('Error parsing stored auth in API interceptor', e);
     }
@@ -44,6 +41,16 @@ export const googleAuthUser = async (googleData) => {
 
 export const getAllNominations = async () => {
   const response = await API.get('/api/admin/nominations');
+  return response.data;
+};
+
+export const localDevLogin = async (email) => {
+  const response = await API.post('/api/auth/local-dev-login', { email });
+  return response.data;
+};
+
+export const createAdminNomination = async (data) => {
+  const response = await API.post('/api/admin/nominations', data);
   return response.data;
 };
 
@@ -100,6 +107,36 @@ export const verifyNomination = async (id, data) => {
   return response.data;
 };
 
+export const setAwardResult = async (id, awardResult, revocationReason = '') => {
+  const response = await API.put(`/api/admin/nominations/${id}/award-result`, { awardResult, revocationReason });
+  return response.data;
+};
+
+export const saveReviewAssessment = async (id, reviewers) => {
+  const response = await API.put(`/api/admin/nominations/${id}/review`, { reviewers });
+  return response.data;
+};
+
+export const resendNomineeApproval = async (id) => {
+  const response = await API.post(`/api/admin/nominations/${id}/resend-approval`);
+  return response.data;
+};
+
+export const setNominationWindow = async (startAt, endAt) => {
+  const response = await API.put('/api/admin/nomination-window', { startAt, endAt });
+  return response.data;
+};
+
+export const respondToNomineeApproval = async (token, decision) => {
+  const response = await API.post(`/api/nominee-approval/${encodeURIComponent(token)}`, { decision });
+  return response.data;
+};
+
+export const getNomineeApproval = async (token) => {
+  const response = await API.get(`/api/nominee-approval/${encodeURIComponent(token)}`);
+  return response.data;
+};
+
 export const getLeaderboard = async () => {
   const response = await API.get('/api/leaderboard');
   return response.data;
@@ -110,16 +147,12 @@ export const getNominationStatus = async () => {
   return response.data;
 };
 
-export const toggleNominationStatus = async (isOpen) => {
-  const response = await API.post('/api/admin/nomination-status', { isOpen });
-  return response.data;
-};
-
 export default {
   sendOTP,
   verifyOTP,
   googleAuthUser,
   getAllNominations,
+  createAdminNomination,
   submitNomination,
   getNomination,
   updateNomination,
@@ -129,8 +162,12 @@ export default {
   sendOtp,
   verifyOtp,
   verifyNomination,
+  setAwardResult,
+  resendNomineeApproval,
+  setNominationWindow,
+  getNomineeApproval,
+  respondToNomineeApproval,
   getLeaderboard,
   getNominationStatus,
-  toggleNominationStatus,
 };
 

@@ -1,7 +1,10 @@
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const { createSignedToken } = require('../utils/signedToken');
 
 // In-memory OTP storage: email -> { otp, expiresAt, verified }
 const otpStore = new Map();
+const hashOtp = (otp) => crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
 
 // Helper to create Nodemailer transporter using configured SMTP/Gmail/Outlook credentials
 const getTransporter = async () => {
@@ -68,23 +71,7 @@ const getTransporter = async () => {
 };
 
 // Backup transporter if main transporter fails authentication
-const getFallbackTransporter = async () => {
-  const testAccount = await nodemailer.createTestAccount();
-  return {
-    transporter: nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    }),
-    from: `"NEC Alumni Award Portal" <${testAccount.user}>`,
-  };
-};
-
-// Send OTP controller - REAL TIME EMAIL DELIVERY WITH RESILIENT FALLBACK
+// Send OTP controller for nominee email verification.
 exports.sendOtp = async (req, res) => {
   let cleanEmail = '';
   try {
@@ -98,16 +85,15 @@ exports.sendOtp = async (req, res) => {
     }
 
     cleanEmail = email.trim().toLowerCase();
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000; // Expires in 10 minutes
 
-    otpStore.set(cleanEmail, { otp, expiresAt, verified: false });
+    otpStore.set(cleanEmail, { otpHash: hashOtp(otp), expiresAt, attempts: 0 });
 
     let mailConfig = await getTransporter();
 
-    // If no transporter configured, create automatic test transporter
     if (!mailConfig) {
-      mailConfig = await getFallbackTransporter();
+      return res.status(503).json({ success: false, message: 'Nominee verification email is not configured. Ask the administrator to configure SMTP.' });
     }
 
     const htmlContent = `
@@ -141,40 +127,15 @@ exports.sendOtp = async (req, res) => {
         html: htmlContent,
       });
 
-      console.log(`[EMAIL SENT] OTP successfully sent to ${cleanEmail}`);
+      console.log(`[EMAIL SENT] Nominee verification OTP sent to ${cleanEmail}`);
       return res.status(200).json({
         success: true,
         message: `OTP sent successfully to ${cleanEmail}. Please check your email inbox.`,
       });
     } catch (primaryMailError) {
-      console.warn('[PRIMARY SMTP FAILED] Primary transporter failed:', primaryMailError.message);
-      console.log('[FALLBACK] Attempting delivery via secondary backup transporter...');
-
-      // Try fallback transporter if primary fails
-      try {
-        const fallbackConfig = await getFallbackTransporter();
-        const info = await fallbackConfig.transporter.sendMail({
-          from: fallbackConfig.from,
-          to: cleanEmail,
-          subject: 'Your Verification Code - NEC Alumni Award Nomination',
-          html: htmlContent,
-        });
-
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        console.log(`[FALLBACK EMAIL SENT] Email dispatched. Test preview: ${previewUrl}`);
-
-        return res.status(200).json({
-          success: true,
-          message: `OTP generated for ${cleanEmail}. (Primary Gmail credentials failed: ${primaryMailError.message})`,
-          otp: otp, // Output for convenience when Gmail auth is invalid
-        });
-      } catch (fallbackError) {
-        console.error('Fallback email delivery also failed:', fallbackError);
-        return res.status(500).json({
-          success: false,
-          message: `Failed to send email to ${cleanEmail}: ${primaryMailError.message}`,
-        });
-      }
+      otpStore.delete(cleanEmail);
+      console.error('[SMTP ERROR] Nominee verification email delivery failed:', primaryMailError.message);
+      return res.status(503).json({ success: false, message: 'Could not deliver the verification email. Check SMTP settings and try again.' });
     }
   } catch (error) {
     console.error('Error in sendOtp:', error);
@@ -185,8 +146,6 @@ exports.sendOtp = async (req, res) => {
     });
   }
 };
-
-const { isAdminEmail } = require('../config/adminList');
 
 // Verify OTP controller
 exports.verifyOtp = async (req, res) => {
@@ -218,29 +177,26 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
-    if (storedRecord.otp !== otp.trim()) {
+    storedRecord.attempts += 1;
+    if (storedRecord.attempts > 5) {
+      otpStore.delete(cleanEmail);
+      return res.status(429).json({ success: false, message: 'Too many incorrect codes. Request a new verification email.' });
+    }
+    if (storedRecord.otpHash !== hashOtp(otp)) {
+      otpStore.set(cleanEmail, storedRecord);
       return res.status(400).json({
         success: false,
         message: 'Incorrect OTP code. Please check your email and try again.',
       });
     }
 
-    // Mark as verified
-    storedRecord.verified = true;
-    otpStore.set(cleanEmail, storedRecord);
-
-    const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
-    const userObj = {
-      name: cleanEmail.split('@')[0],
-      email: cleanEmail,
-      role: computedRole,
-    };
+    otpStore.delete(cleanEmail);
+    const verificationToken = createSignedToken({ email: cleanEmail, purpose: 'nominee-email-verification' }, 30 * 60 * 1000);
 
     return res.status(200).json({
       success: true,
       message: 'Email address verified successfully!',
-      user: userObj,
-      token: `auth-token-${computedRole}-${Date.now()}`,
+      verificationToken,
     });
   } catch (error) {
     console.error('Error in verifyOtp:', error);

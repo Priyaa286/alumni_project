@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { sendOTP as sendOtpApi, verifyOTP as verifyOtpApi, googleAuthUser as googleAuthApi } from '../services/api';
-import { isAdminEmail } from '../config/adminList';
+import { sendOTP as sendOtpApi, verifyOTP as verifyOtpApi, googleAuthUser as googleAuthApi, localDevLogin as localDevLoginApi } from '../services/api';
 import { auth, googleProvider, signInWithPopup } from '../config/firebase';
 
 const AuthContext = createContext(null);
 
-const ONE_HOUR_MS = 60 * 60 * 1000; // 1 hour session expiration
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // Keep a signed-in session for 7 days.
 
 export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState(() => {
@@ -13,19 +12,17 @@ export const AuthProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.isAuthenticated && parsed.user) {
-          // Check if 1-hour session has expired
+        if (parsed && parsed.isAuthenticated && parsed.user && typeof parsed.token === 'string' && parsed.token.split('.').length === 2) {
+          // Check whether the saved session has expired.
           if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-            console.log('Session expired (1 hour limit reached). Logging out.');
+            localStorage.removeItem('auth_user');
             localStorage.removeItem('auth_user');
           } else {
-            const cleanEmail = (parsed.user.email || '').trim().toLowerCase();
-            const computedRole = isAdminEmail(cleanEmail) ? 'admin' : (parsed.user.role || 'user');
             return {
               isAuthenticated: true,
-              user: { ...parsed.user, role: computedRole },
-              token: parsed.token || `auth-token-${computedRole}-${Date.now()}`,
-              expiresAt: parsed.expiresAt || (Date.now() + ONE_HOUR_MS),
+              user: { ...parsed.user, role: parsed.user.role || 'user' },
+              token: parsed.token || null,
+              expiresAt: parsed.expiresAt || (Date.now() + SESSION_TTL_MS),
             };
           }
         }
@@ -44,7 +41,7 @@ export const AuthProvider = ({ children }) => {
 
   const [loading, setLoading] = useState(false);
 
-  // Auto logout after 1 hour session duration
+  // Auto logout when the saved session expires.
   useEffect(() => {
     if (authState.isAuthenticated && authState.expiresAt) {
       const timeRemaining = authState.expiresAt - Date.now();
@@ -52,7 +49,6 @@ export const AuthProvider = ({ children }) => {
         logout();
       } else {
         const timer = setTimeout(() => {
-          console.log('1 hour session limit reached. Auto logging out...');
           logout();
         }, timeRemaining);
         return () => clearTimeout(timer);
@@ -62,15 +58,13 @@ export const AuthProvider = ({ children }) => {
 
   // Helper to persist auth session
   const saveAuthSession = (user, token) => {
-    const cleanEmail = (user.email || '').trim().toLowerCase();
-    const computedRole = isAdminEmail(cleanEmail) ? 'admin' : (user.role || 'user');
-    const updatedUser = { ...user, role: computedRole };
-    const expiresAt = Date.now() + ONE_HOUR_MS;
+    const updatedUser = { ...user, role: user.role || 'user' };
+    const expiresAt = Date.now() + SESSION_TTL_MS;
 
     const newState = {
       isAuthenticated: true,
       user: updatedUser,
-      token: token || `auth-token-${computedRole}-${Date.now()}`,
+      token: token || null,
       expiresAt,
     };
     setAuthState(newState);
@@ -110,11 +104,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await verifyOtpApi(cleanEmail, inputOtp);
       if (res.success) {
-        const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
         const userObj = res.user || {
           name: cleanEmail.split('@')[0],
           email: cleanEmail,
-          role: computedRole,
+          role: 'user',
         };
         saveAuthSession(userObj, res.token);
         return { success: true, user: userObj };
@@ -136,82 +129,37 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
 
     try {
-      // 1. Try Firebase Popup Authentication if configured
-      if (auth && googleProvider) {
-        try {
-          const result = await signInWithPopup(auth, googleProvider);
-          const firebaseUser = result.user;
-          const cleanEmail = firebaseUser.email.toLowerCase();
-
-          const googleData = {
-            email: cleanEmail,
-            name: firebaseUser.displayName || cleanEmail.split('@')[0],
-            avatarUrl: firebaseUser.photoURL || '',
-            googleId: firebaseUser.uid,
-          };
-
-          // Sync with backend controller
-          try {
-            const res = await googleAuthApi(googleData);
-            if (res.success && res.user) {
-              saveAuthSession(res.user, res.token);
-              return { success: true, user: res.user };
-            }
-          } catch (backendErr) {
-            console.warn('Backend sync failed after Google auth, using Firebase payload:', backendErr);
-          }
-
-          const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
-          const fallbackUser = {
-            name: googleData.name,
-            email: googleData.email,
-            role: computedRole,
-            authProvider: 'google',
-            avatarUrl: googleData.avatarUrl,
-          };
-
-          saveAuthSession(fallbackUser);
-          return { success: true, user: fallbackUser };
-        } catch (popupErr) {
-          console.warn('Firebase popup notice:', popupErr.message);
-        }
+      if (!auth || !googleProvider) {
+        return { success: false, message: 'Google sign-in is not configured. Please use email OTP.' };
       }
-
-      // 2. Interactive Google Account Email Prompt for Demo/Development Environments
-      const userGoogleEmail = window.prompt('Enter your Google Email ID to sign in:');
-      if (!userGoogleEmail || !userGoogleEmail.trim()) {
-        setLoading(false);
-        return { success: false, message: '' }; // Clean cancellation without red error banner
+      const result = await signInWithPopup(auth, googleProvider);
+      const firebaseUser = result.user;
+      const idToken = await firebaseUser.getIdToken();
+      const response = await googleAuthApi({ idToken });
+      if (!response.success || !response.user || !response.token) {
+        return { success: false, message: response.message || 'Google sign-in could not be verified.' };
       }
-
-      const cleanEmail = userGoogleEmail.trim().toLowerCase();
-      const computedRole = isAdminEmail(cleanEmail) ? 'admin' : 'user';
-
-      const userName = cleanEmail.split('@')[0].replace(/[._]/g, ' ');
-      const formattedName = userName.charAt(0).toUpperCase() + userName.slice(1);
-      const googleUser = {
-        name: formattedName,
-        email: cleanEmail,
-        role: computedRole,
-        authProvider: 'google',
-        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}`,
-      };
-
-      try {
-        await googleAuthApi({
-          email: cleanEmail,
-          name: googleUser.name,
-          avatarUrl: googleUser.avatarUrl,
-        });
-      } catch (e) {
-        // Backend sync optional
-      }
-
-      saveAuthSession(googleUser);
-      return { success: true, user: googleUser };
+      saveAuthSession(response.user, response.token);
+      return { success: true, user: response.user };
     } catch (err) {
       console.error('Google login error:', err);
-      return { success: false, message: 'Google Sign-In encountered an issue.' };
+      return { success: false, message: err.response?.data?.message || err.message || 'Google Sign-In encountered an issue.' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginLocally = async (email) => {
+    setLoading(true);
+    try {
+      const response = await localDevLoginApi(email.trim().toLowerCase());
+      if (!response.success || !response.user || !response.token) {
+        return { success: false, message: response.message || 'Local sign-in failed.' };
+      }
+      saveAuthSession(response.user, response.token);
+      return { success: true, user: response.user };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'Local sign-in is disabled. Set LOCAL_DEV_AUTH=true in backend/.env and restart the backend.' };
     } finally {
       setLoading(false);
     }
@@ -239,6 +187,7 @@ export const AuthProvider = ({ children }) => {
         requestOtp,
         verifyOtpCode,
         loginWithGoogle,
+        loginLocally,
         logout,
       }}
     >

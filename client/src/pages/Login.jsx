@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, ArrowRight, ShieldCheck, AlertCircle, ArrowLeft, RefreshCw, CheckCircle2, FileCode, Info } from 'lucide-react';
+import { Mail, ArrowRight, ShieldCheck, AlertCircle, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
+import { googleSignInConfigured } from '../config/firebase';
 
-import { isAdminEmail } from '../config/adminList';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { requestOtp, verifyOtpCode, isAuthenticated, user, loading: authLoading } = useAuth();
+  const { requestOtp, verifyOtpCode, loginWithGoogle, loginLocally, isAuthenticated, user, loading: authLoading } = useAuth();
+  const isLocalDevelopment = import.meta.env.DEV && ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
 
   // Screen View Step: 'email' or 'otp'
   const [step, setStep] = useState('email');
@@ -17,7 +18,6 @@ const Login = () => {
   // Form State
   const [email, setEmail] = useState('');
   const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
-  const [isEmailConfigured, setIsEmailConfigured] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -30,7 +30,7 @@ const Login = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === 'admin' || isAdminEmail(user.email)) {
+      if (user.role === 'admin') {
         navigate('/admin/responses', { replace: true });
       } else {
         navigate('/nomination', { replace: true });
@@ -74,7 +74,6 @@ const Login = () => {
     try {
       const res = await requestOtp(email.trim());
       if (res.success) {
-        setIsEmailConfigured(res.emailConfigured !== false);
         toast.success(`Verification code sent to ${email.trim()}`);
         setStep('otp');
         setResendTimer(60); // 60 seconds resend timer
@@ -89,6 +88,36 @@ const Login = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    const result = await loginWithGoogle();
+    if (result.success) {
+      navigate(result.user.role === 'admin' ? '/admin/responses' : '/nomination', { replace: true });
+    } else if (result.message) {
+      setError(result.message);
+      toast.error(result.message);
+    }
+  };
+
+  const handleLocalSignIn = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!email.trim()) {
+      setError('Enter an email address.');
+      return;
+    }
+    setIsSubmitting(true);
+    const result = await loginLocally(email);
+    if (result.success) {
+      toast.success(`Signed in locally as ${result.user.role}.`);
+      navigate(result.user.role === 'admin' ? '/admin/responses' : '/nomination', { replace: true });
+    } else {
+      setError(result.message);
+      toast.error(result.message);
+    }
+    setIsSubmitting(false);
   };
 
   /**
@@ -215,7 +244,7 @@ const Login = () => {
                 className="space-y-5"
               >
                 {/* Email Form */}
-                <form onSubmit={handleSendOtp} className="space-y-4">
+                <form onSubmit={isLocalDevelopment ? handleLocalSignIn : handleSendOtp} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Email Address
@@ -247,16 +276,39 @@ const Login = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Sending Verification Code...</span>
+                        <span>{isLocalDevelopment ? 'Signing in locally...' : 'Sending Verification Code...'}</span>
                       </>
                     ) : (
                       <>
-                        <span>Send 6-Digit OTP Code</span>
+                        <span>{isLocalDevelopment ? 'Sign In for Local Development' : 'Send 6-Digit OTP Code'}</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
                 </form>
+                {googleSignInConfigured ? (
+                  <>
+                    <div className="relative py-1 text-center text-[11px] font-semibold text-slate-400">
+                      <span className="relative z-10 bg-white px-3">OR</span>
+                      <span className="absolute left-0 right-0 top-1/2 border-t border-slate-200" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignIn}
+                      disabled={isSubmitting || authLoading}
+                      className="w-full py-3 px-6 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      <span className="text-base font-black text-blue-600">G</span>
+                      Continue with Google
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-center text-xs text-slate-500">
+                    {isLocalDevelopment
+                      ? 'Local development sign-in is available on this computer only.'
+                      : 'Google sign-in is unavailable until Firebase is configured. Contact the site administrator to enable sign-in.'}
+                  </p>
+                )}
               </motion.div>
             ) : (
               /* STEP 2: OTP VERIFICATION VIEW */

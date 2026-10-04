@@ -1,234 +1,117 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Database, Sparkles, CheckCircle2, Award, GraduationCap, Users, Briefcase, Video, Building, RefreshCw, UserCheck } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Video, Users, Database, RefreshCw } from 'lucide-react';
+import { lookupMemberByEmail } from '../services/api';
+
+const activityTypes = [
+  { id: 'Mentoring', label: 'Mentorship and student guidance', icon: Users },
+  { id: 'Webinar', label: 'Webinars and guest lectures', icon: Video },
+];
+
+const describeRecord = (record) => [
+  record.title,
+  record.description,
+  record.date,
+  record.organization,
+  record.venue,
+  record.speakerName && `Speaker: ${record.speakerName}`,
+  record.designation,
+  record.participants ? `${record.participants} participants` : '',
+].filter(Boolean).join(' — ');
 
 const Step5NECContribution = ({ register, formState: { errors }, watch, setValue }) => {
+  const nomineeEmail = watch('nominee.email') || '';
   const selectedActivities = watch('necContribution.activities') || [];
-  const currentDetails = watch('necContribution.details') || '';
-  
-  const nomineeName = watch('nominee.name') || 'Alumnus';
-  const nomineeDept = watch('nominee.department') || 'Engineering';
-  const nominationType = watch('nominationType') || 'self';
+  const details = watch('necContribution.details') || '';
+  const [records, setRecords] = useState({ mentoring: [], webinars: [] });
+  const [loading, setLoading] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState('');
 
-  const [lastLoadedNominee, setLastLoadedNominee] = useState('');
-
-  // Dynamically generate institutional contribution records tailored to nominee details
-  const contributionRecords = useMemo(() => {
-    const displayName = nomineeName.trim() ? nomineeName : 'Nominee';
-    const deptText = nomineeDept ? ` (${nomineeDept})` : '';
-
-    return {
-      Scholarship: {
-        title: 'Financial Support / Scholarships to Students',
-        icon: GraduationCap,
-        countText: `15 Merit-cum-Means Scholarships Funded by ${displayName}`,
-        badge: '15 Students Benefited • ₹3,50,000 Funded',
-        autoCheck: true,
-        summary: `${displayName} sponsored 15 deserving undergraduate students under the Alumni Merit Scholarship Fund with a total contribution of ₹3,50,000 across 2021-2024 academic years.`
-      },
-      Mentoring: {
-        title: 'Mentoring / Student Guidance',
-        icon: Users,
-        countText: `28 Students Mentored across 3 Batches${deptText}`,
-        badge: '28 Students Mentored • 12 Guidance Sessions',
-        autoCheck: true,
-        summary: `${displayName} actively mentored 28 final-year students in career planning, higher studies abroad, and industry skill preparation through regular 1-on-1 virtual sessions.`
-      },
-      Placement: {
-        title: 'Placement Support / Training',
-        icon: Briefcase,
-        countText: '12 Students Recruited & Mock Interviews',
-        badge: '12 Campus Placements • 3 Referral Drives',
-        autoCheck: true,
-        summary: `Facilitated campus placement drives at corporate organization, enabling successful recruitment of 12 NEC graduates and conducting pre-placement mock interviews.`
-      },
-      Internship: {
-        title: 'Providing Internships to Students',
-        icon: Award,
-        countText: '8 Summer Internships Granted',
-        badge: '8 Internships • ₹15,000/mo Stipend',
-        autoCheck: nominationType === 'others', // Checked by default when nominating others
-        summary: `${displayName} offered 8 summer internships with stipend to pre-final year NEC students, providing hands-on industry project exposure.`
-      },
-      Webinar: {
-        title: 'Conducting Webinars / Guest Lectures',
-        icon: Video,
-        countText: `4 Technical Guest Lectures Conducted in ${nomineeDept || 'Department'}`,
-        badge: '4 Guest Lectures • 450+ Attendees',
-        autoCheck: true,
-        summary: `${displayName} delivered 4 guest lectures and technical keynotes on emerging technologies in ${nomineeDept || 'NEC'}, reaching over 450+ students and faculty members.`
-      },
-      'Association Activities': {
-        title: 'Alumni Association Active Coordinator',
-        icon: Award,
-        countText: 'Regional Alumni Chapter Coordinator',
-        badge: 'Regional Chapter Lead • 6 Events',
-        autoCheck: false,
-        summary: `${displayName} served as an active regional chapter coordinator for NEC Alumni Association, organizing 6 alumni meetups and networking events.`
-      },
-      'Institution Development': {
-        title: 'Institution Infrastructure / R&D Development Support',
-        icon: Building,
-        countText: 'IoT & AI Research Lab Equipment Co-sponsored',
-        badge: 'R&D Lab Support • ₹5,00,000 Donated',
-        autoCheck: false,
-        summary: `Contributed ₹5,00,000 towards setting up the advanced IoT & AI Innovation Research Laboratory at NEC campus.`
-      }
-    };
-  }, [nomineeName, nomineeDept, nominationType]);
-
-  const activitiesList = [
-    { id: 'Scholarship', label: 'Financial Support / Scholarships to Students' },
-    { id: 'Mentoring', label: 'Mentoring / Student Guidance' },
-    { id: 'Placement', label: 'Placement Support / Training' },
-    { id: 'Internship', label: 'Providing Internships to Students' },
-    { id: 'Webinar', label: 'Conducting Webinars / Guest Lectures' },
-    { id: 'Association Activities', label: 'Alumni Association Active Coordinator' },
-    { id: 'Institution Development', label: 'Institution Infrastructure / R&D Development Support' }
-  ];
-
-  // Helper function to load nominee records into form
-  const loadNomineeRecords = (force = false) => {
-    if (!setValue) return;
-
-    const defaultChecked = Object.keys(contributionRecords).filter(
-      (key) => contributionRecords[key].autoCheck
-    );
-
-    if (force || selectedActivities.length === 0) {
-      setValue('necContribution.activities', defaultChecked, { shouldValidate: true });
-    }
-
-    if (force || !currentDetails) {
-      const activeKeys = force ? defaultChecked : (selectedActivities.length > 0 ? selectedActivities : defaultChecked);
-      const generatedDetails = activeKeys
-        .map((key) => {
-          const rec = contributionRecords[key];
-          return rec ? `${rec.title}: ${rec.badge}` : `${key}: Contribution Recorded`;
-        })
-        .filter(Boolean)
-        .join('\n');
-
-      setValue('necContribution.details', generatedDetails, { shouldValidate: true });
-    }
-
-    setLastLoadedNominee(nomineeName);
-  };
-
-  // Automatically fetch & populate contribution details whenever entering Step 5 or switching nominee
   useEffect(() => {
-    if (lastLoadedNominee !== nomineeName || selectedActivities.length === 0) {
-      loadNomineeRecords(selectedActivities.length === 0 || lastLoadedNominee !== nomineeName);
+    let cancelled = false;
+    if (!nomineeEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nomineeEmail)) {
+      setRecords({ mentoring: [], webinars: [] });
+      setLookupMessage('Enter the nominee email in Step 1 to check available records.');
+      return undefined;
     }
-  }, [nomineeName, nominationType]);
 
-  // Handler to force re-generate summary text based on selected items & nominee details
-  const handleAutoGenerateSummary = () => {
-    if (selectedActivities.length === 0) {
-      alert('Please select at least one contribution area first.');
-      return;
-    }
-    const generated = selectedActivities
-      .map((key) => {
-        const record = contributionRecords[key];
-        return record ? `${record.title}: ${record.badge}` : `${key}: Contribution Recorded`;
+    setLoading(true);
+    lookupMemberByEmail(nomineeEmail)
+      .then((response) => {
+        if (cancelled) return;
+        const fetched = response.data?.contributions || {};
+        const mentoring = Array.isArray(fetched.mentoring) ? fetched.mentoring : [];
+        const webinars = Array.isArray(fetched.webinars) ? fetched.webinars : [];
+        setRecords({ mentoring, webinars });
+        setLookupMessage(mentoring.length || webinars.length
+          ? 'Records were fetched from the alumni database. Review and correct them below.'
+          : 'No mentorship or webinar records are available in the alumni database. Add any missing details manually.');
+
+        const activityMap = { Mentoring: mentoring, Webinar: webinars };
+        const existingActivities = watch('necContribution.activities') || [];
+        const found = Object.entries(activityMap).filter(([, items]) => items.length).map(([name]) => name);
+        if (found.length) {
+          setValue('necContribution.activities', [...new Set([...existingActivities, ...found])], { shouldValidate: true });
+          const fetchedText = Object.entries(activityMap)
+            .filter(([, items]) => items.length)
+            .map(([name, items]) => `${name}:\n${items.map(describeRecord).join('\n')}`)
+            .join('\n\n');
+          const existingText = watch('necContribution.details') || '';
+          if (!existingText.includes(fetchedText)) {
+            setValue('necContribution.details', existingText.trim() ? `${existingText.trim()}\n\n${fetchedText}` : fetchedText, { shouldValidate: true });
+          }
+        }
       })
-      .join('\n');
+      .catch(() => {
+        if (!cancelled) setLookupMessage('Could not fetch alumni activity records. You can enter them manually.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    if (setValue) {
-      setValue('necContribution.details', generated, { shouldValidate: true });
-    }
-  };
+    return () => { cancelled = true; };
+  }, [nomineeEmail, setValue, watch]);
+
+  const allRecords = [...records.mentoring, ...records.webinars];
 
   return (
     <div className="space-y-6">
       <div className="border-b border-slate-200 pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 className="font-heading text-xl font-bold text-primary">Contribution to NEC</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Provide detailed information about contributions to National Engineering College & Alumni Association.
-            </p>
-          </div>
-          
-        </div>
+        <h2 className="font-heading text-xl font-bold text-primary">Contribution to NEC</h2>
+        <p className="text-xs text-slate-500 mt-1">
+          Review database records and add any missing contributions. All details remain editable.
+        </p>
       </div>
 
-      
-      {/* Checkboxes List with Dynamic Fetched Metric Badges */}
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-bold text-slate-700 mb-2">
-          Select all areas of contribution:
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {activitiesList.map((activity) => {
-            const isChecked = selectedActivities.includes(activity.id);
-            const record = contributionRecords[activity.id];
-            const Icon = record?.icon || Award;
-
-            return (
-              <div
-                key={activity.id}
-                className={`p-4 rounded-nec border transition-all duration-200 flex flex-col justify-between ${
-                  isChecked
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-borderlight bg-white hover:bg-slate-50'
-                }`}
-              >
-                <label className="flex items-start gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    value={activity.id}
-                    {...register('necContribution.activities')}
-                    className="w-5 h-5 mt-0.5 text-primary border-slate-300 rounded focus:ring-primary"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-bold text-slate-800 leading-tight block">
-                      {activity.label}
-                    </span>
-                    {record && (
-                      <span className="text-xs text-slate-500 font-medium mt-0.5 block">
-                        {record.countText}
-                      </span>
-                    )}
-                  </div>
-                </label>
-
-                {/* Fetched Metric Badge Card when Checked */}
-                {isChecked && record && (
-                  <div className="mt-3 pt-2.5 border-t border-primary/10 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                      <Icon className="w-3.5 h-3.5 text-secondary" />
-                      <span>{record.badge}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        {loading ? <RefreshCw className="mt-0.5 h-4 w-4 animate-spin text-primary" /> : <Database className="mt-0.5 h-4 w-4 text-primary" />}
+        <span>{lookupMessage || (allRecords.length ? `${allRecords.length} activity record(s) found.` : 'Checking the alumni database…')}</span>
       </div>
 
-      {/* Contribution Details Textarea */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {activityTypes.map(({ id, label, icon: Icon }) => {
+          const count = id === 'Mentoring' ? records.mentoring.length : records.webinars.length;
+          return (
+            <label key={id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${selectedActivities.includes(id) ? 'border-primary bg-primary/5' : 'border-slate-200 bg-white'}`}>
+              <input type="checkbox" value={id} {...register('necContribution.activities')} className="h-4 w-4 accent-purple-700" />
+              <Icon className="h-5 w-5 text-primary" />
+              <span className="flex-1 text-sm font-semibold text-slate-800">{label}</span>
+              <span className="text-xs text-slate-500">{count} records</span>
+            </label>
+          );
+        })}
+      </div>
+
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-bold text-slate-700">
-            Details of Contribution <span className="text-red-500">*</span>
-          </label>
-          <span className="text-xs text-slate-400 font-medium">
-            Auto-populated from nominee records • Editable
-          </span>
-        </div>
+        <label className="text-sm font-bold text-slate-700" htmlFor="nec-contribution-details">Contribution details <span className="text-red-500">*</span></label>
         <textarea
-          rows="7"
-          placeholder="Describe contributions in detail (e.g. amount funded, events conducted, placements coordinated, number of students mentored)..."
-          {...register('necContribution.details', { required: 'Please provide detailed contribution descriptions' })}
-          className={`w-full px-4 py-3 rounded-nec border ${
-            errors?.necContribution?.details ? 'border-red-500 focus:ring-red-200' : 'border-borderlight focus:ring-primary/20'
-          } focus:outline-none focus:ring-4 transition-all resize-none text-sm text-slate-800 font-sans leading-relaxed`}
+          id="nec-contribution-details"
+          rows="8"
+          placeholder="Describe mentorship, webinars, or other contributions. Correct any fetched details that are outdated."
+          {...register('necContribution.details', { required: 'Please provide contribution details' })}
+          className={`w-full rounded-xl border px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-4 ${errors?.necContribution?.details ? 'border-red-500 focus:ring-red-100' : 'border-slate-200 focus:ring-primary/10'}`}
         />
-        {errors?.necContribution?.details && (
-          <span className="text-xs text-red-500 font-medium">{errors.necContribution.details.message}</span>
-        )}
+        {errors?.necContribution?.details && <span className="text-xs font-medium text-red-500">{errors.necContribution.details.message}</span>}
+        {allRecords.length > 0 && <p className="text-xs text-slate-500">Fetched activity details are editable and can be corrected before submission.</p>}
       </div>
     </div>
   );

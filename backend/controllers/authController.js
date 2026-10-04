@@ -3,6 +3,7 @@ const User = require('../models/User');
 const OTP = require('../models/OTP');
 const { isAdminEmail, ADMIN_EMAILS } = require('../config/adminList');
 const { sendOTPEmail } = require('../utils/sendEmail');
+const { createSignedToken } = require('../utils/signedToken');
 
 // In-Memory Fallback OTP Storage for high reliability (stores hashed OTP)
 const memoryOtpStore = new Map();
@@ -64,9 +65,12 @@ exports.sendOTP = async (req, res) => {
     const emailResult = await sendOTPEmail(cleanEmail, rawOtp);
 
     if (!emailResult.sent) {
+      const smtpMissing = emailResult.reason?.includes('not configured');
       return res.status(503).json({
         success: false,
-        message: 'Email service is currently unavailable. Please try again later.',
+        message: smtpMissing
+          ? 'Email OTP is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS in backend/.env, then restart the backend.'
+          : 'The email server could not send the OTP. Check the SMTP settings in backend/.env and restart the backend.',
         emailConfigured: false,
       });
     }
@@ -191,10 +195,17 @@ exports.verifyOTP = async (req, res) => {
       avatarUrl: userObj?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}`,
     };
 
+    let token;
+    try {
+      token = createSignedToken({ email: cleanEmail, role });
+    } catch (tokenError) {
+      return res.status(503).json({ success: false, message: tokenError.message });
+    }
+
     return res.status(200).json({
       success: true,
       message: `Authenticated successfully as ${role.toUpperCase()}.`,
-      token: `auth-token-${role}-${Date.now()}`,
+      token,
       user: userData,
     });
   } catch (error) {
@@ -211,16 +222,31 @@ exports.verifyOTP = async (req, res) => {
  */
 exports.googleAuth = async (req, res) => {
   try {
-    const { email, name, avatarUrl, googleId } = req.body;
-
-    if (!email) {
+    const { idToken } = req.body;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    if (!idToken || !projectId) {
       return res.status(400).json({
         success: false,
-        message: 'Google Sign-In requires a valid email address.',
+        message: 'Google sign-in is not configured. Set FIREBASE_PROJECT_ID and complete Google sign-in first.',
       });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const tokenInfoUrl = new URL('https://oauth2.googleapis.com/tokeninfo');
+    tokenInfoUrl.searchParams.set('id_token', idToken);
+    const tokenInfoResponse = await fetch(tokenInfoUrl);
+    if (!tokenInfoResponse.ok) {
+      return res.status(401).json({ success: false, message: 'Google sign-in token is invalid or expired.' });
+    }
+    const tokenInfo = await tokenInfoResponse.json();
+    const allowedIssuers = ['https://accounts.google.com', `https://securetoken.google.com/${projectId}`];
+    if (tokenInfo.aud !== projectId || !allowedIssuers.includes(tokenInfo.iss) || ![true, 'true'].includes(tokenInfo.email_verified)) {
+      return res.status(401).json({ success: false, message: 'Google sign-in token could not be verified for this application.' });
+    }
+
+    const cleanEmail = String(tokenInfo.email || '').trim().toLowerCase();
+    if (!cleanEmail) return res.status(401).json({ success: false, message: 'Google did not provide a verified email address.' });
+    const name = tokenInfo.name || cleanEmail.split('@')[0];
+    const avatarUrl = tokenInfo.picture || '';
     
     // Automatically determine role based on configuration
     const role = isAdminEmail(cleanEmail) ? 'admin' : 'user';
@@ -243,12 +269,19 @@ exports.googleAuth = async (req, res) => {
       console.warn('Google auth DB sync warning:', e.message);
     }
 
+    let token;
+    try {
+      token = createSignedToken({ email: cleanEmail, role });
+    } catch (tokenError) {
+      return res.status(503).json({ success: false, message: tokenError.message });
+    }
+
     return res.status(200).json({
       success: true,
       message: `Signed in with Google successfully as ${role.toUpperCase()}.`,
-      token: `google-token-${role}-${Date.now()}`,
+      token,
       user: {
-        id: userObj ? userObj._id : googleId || Date.now().toString(),
+        id: userObj ? userObj._id : tokenInfo.sub,
         name: name || (userObj ? userObj.name : cleanEmail.split('@')[0]),
         email: cleanEmail,
         role: role,
@@ -274,4 +307,30 @@ exports.getAdminInfo = (req, res) => {
     adminEmailsCount: ADMIN_EMAILS.length,
     configFile: 'alumni_project/backend/config/adminList.js',
   });
+};
+
+/** Local-only sign-in for development when SMTP/Firebase are not configured. */
+exports.localDevLogin = (req, res) => {
+  const localOnly = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
+  if (process.env.NODE_ENV === 'production' || process.env.LOCAL_DEV_AUTH !== 'true' || !localOnly) {
+    return res.status(404).json({ success: false, message: 'Local development sign-in is disabled.' });
+  }
+
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+  }
+
+  const role = isAdminEmail(email) ? 'admin' : 'user';
+  try {
+    const token = createSignedToken({ email, role });
+    const name = email.split('@')[0].replace(/[._]/g, ' ');
+    return res.status(200).json({
+      success: true,
+      token,
+      user: { id: `local-${email}`, name, email, role, authProvider: 'local-development' },
+    });
+  } catch (error) {
+    return res.status(503).json({ success: false, message: 'Set AUTH_TOKEN_SECRET in backend/.env and restart the backend.' });
+  }
 };

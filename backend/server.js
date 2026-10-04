@@ -5,6 +5,9 @@ require('dotenv').config();
 
 const connectDB = require('./config/db');
 const nominationRoutes = require('./routes/nominationRoutes');
+const authRoutes = require('./routes/authRoutes');
+const memberRoutes = require('./routes/memberRoutes');
+const otpRoutes = require('./routes/otpRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 
@@ -27,6 +30,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api', nominationRoutes);
+app.use('/api', authRoutes);
+app.use('/api/otp', otpRoutes);
+app.use('/api', memberRoutes);
 app.use('/api', uploadRoutes);
 
 // Root route placeholder

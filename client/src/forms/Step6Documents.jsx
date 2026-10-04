@@ -13,11 +13,21 @@ import {
 
 const Step6Documents = ({ watch, setValue }) => {
   const documents = watch('documents') || {};
+  const nominationType = watch('nominationType') || 'self';
   const [uploading, setUploading] = useState({});
 
   const documentTypes = [
+    { key: 'photos', label: 'Two Recent Photographs', required: true, maxFiles: 2, imagesOnly: true },
+    { key: 'identityProof', label: 'Proof of Identity', required: true },
+    { key: 'eligibilityProof', label: 'Documents Proving Eligibility', required: true },
     { key: 'certificates', label: 'Academic & Professional Certificates', required: true },
     { key: 'achievements', label: 'Awards & Achievements Proof', required: true },
+    { key: 'appreciationLetters', label: 'Letters of Appreciation / News Articles', required: true },
+    { key: 'shortProfile', label: 'Short Profile', required: true },
+    ...(nominationType === 'self' ? [] : [
+      { key: 'nomineeDetails', label: 'Nominee Details', required: true },
+      { key: 'nomineeConsent', label: 'Nominee Consent Letter', required: true },
+    ]),
     { key: 'organizationProfile', label: 'Organization Profile / Brochure', required: false },
     { key: 'patents', label: 'Patents Copy (if any)', required: false },
     { key: 'publications', label: 'Publications / Journals Copy (if any)', required: false },
@@ -25,25 +35,31 @@ const Step6Documents = ({ watch, setValue }) => {
     { key: 'otherDocuments', label: 'Other Supporting Documents', required: false }
   ];
 
-  const handleUpload = async (files, key) => {
+  const handleUpload = async (files, docType) => {
     if (!files || files.length === 0) return;
-    const file = files[0];
+    const { key } = docType;
+    const invalidFile = files.find((file) => file.size > 10 * 1024 * 1024);
 
     // File validation: Size <= 10MB
-    if (file.size > 10 * 1024 * 1024) {
+    if (invalidFile) {
       toast.error('File size exceeds the 10MB limit.');
       return;
     }
 
     try {
       setUploading((prev) => ({ ...prev, [key]: true }));
-      const response = await uploadFile(file);
+      const filesToUpload = docType.maxFiles ? files.slice(0, docType.maxFiles - (documents[key]?.length || 0)) : files.slice(0, 1);
+      if (filesToUpload.length === 0) {
+        toast.info(`You can upload up to ${docType.maxFiles} files here.`);
+        return;
+      }
+      const responses = await Promise.all(filesToUpload.map((selectedFile) => uploadFile(selectedFile)));
       
       const currentList = documents[key] || [];
-      setValue(`documents.${key}`, [...currentList, response.fileUrl], {
+      setValue(`documents.${key}`, [...currentList, ...responses.map((response) => response.fileUrl)], {
         shouldValidate: true
       });
-      toast.success(`${file.name} uploaded successfully.`);
+      toast.success(`${filesToUpload.length} file${filesToUpload.length === 1 ? '' : 's'} uploaded successfully.`);
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || 'File upload failed');
@@ -69,14 +85,18 @@ const Step6Documents = ({ watch, setValue }) => {
   // Document Dropzone Sub-Component
   const DocumentDropzone = ({ docType }) => {
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-      onDrop: (acceptedFiles) => handleUpload(acceptedFiles, docType.key),
-      accept: {
+      onDrop: (acceptedFiles) => handleUpload(acceptedFiles, docType),
+      accept: docType.imagesOnly ? {
+        'image/png': ['.png'],
+        'image/jpeg': ['.jpeg', '.jpg']
+      } : {
         'application/pdf': ['.pdf'],
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
         'image/png': ['.png'],
         'image/jpeg': ['.jpeg', '.jpg']
       },
-      multiple: false
+      multiple: Boolean(docType.maxFiles),
+      maxFiles: docType.maxFiles || 1
     });
 
     const fileList = documents[docType.key] || [];
@@ -88,7 +108,7 @@ const Step6Documents = ({ watch, setValue }) => {
           <label className="text-sm font-bold text-slate-700">
             {docType.label} {docType.required && <span className="text-red-500">*</span>}
           </label>
-          {fileList.length > 0 && (
+              {fileList.length > 0 && (
             <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200 flex items-center gap-1">
               <CheckCircle className="w-3.5 h-3.5" />
               Uploaded
@@ -116,7 +136,7 @@ const Step6Documents = ({ watch, setValue }) => {
             <div className="flex flex-col items-center gap-1">
               <Upload className="w-7 h-7 text-slate-400 mb-1 group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-slate-600">Drag & drop or browse</span>
-              <span className="text-[10px] text-slate-400">PDF, DOCX, PNG, JPEG (Max 10MB)</span>
+              <span className="text-[10px] text-slate-400">{docType.imagesOnly ? 'JPG or PNG, up to 10MB each' : 'PDF, DOCX, PNG, JPEG (Max 10MB)'}</span>
             </div>
           )}
         </div>
@@ -161,7 +181,7 @@ const Step6Documents = ({ watch, setValue }) => {
       <div className="border-b border-slate-200 pb-4">
         <h2 className="font-heading text-xl font-bold text-primary">Supporting Documents</h2>
         <p className="text-xs text-slate-500 mt-1">
-          Upload certificates and relevant evidence to support the nomination. Certificates and Achievements are required.
+          Upload the signed application, two recent photographs, identity and eligibility proof, achievement evidence, appreciation letters or news articles, and a short profile. Nominations by others also need nominee details and a consent letter.
         </p>
       </div>
 

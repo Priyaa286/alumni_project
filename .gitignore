@@ -5,3 +5,4 @@ node_modules/
 client/dist/
 backend/uploads/
 test.members.json
+backend/data/private/

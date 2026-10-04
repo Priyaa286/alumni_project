@@ -1,14 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
-// Firebase Config Placeholder (User can replace with their actual Firebase project keys if desired)
 const firebaseConfig = {
-  apiKey: "AIzaSyDemoConfigKeyForNECAlumniPortalAuth",
-  authDomain: "nec-alumni-portal.firebaseapp.com",
-  projectId: "nec-alumni-portal",
-  storageBucket: "nec-alumni-portal.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:demoappid12345678"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
@@ -17,6 +16,9 @@ let auth = null;
 let googleProvider = null;
 
 try {
+  if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
+    throw new Error('Firebase environment variables are not configured.');
+  }
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
@@ -27,4 +29,5 @@ try {
   console.warn('Firebase initialization notice:', e.message);
 }
 
+export const googleSignInConfigured = Boolean(auth && googleProvider);
 export { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword };

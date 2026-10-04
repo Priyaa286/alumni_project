@@ -7,6 +7,7 @@ import NominationForm from './pages/NominationForm';
 import AdminResponses from './pages/AdminResponses';
 import NomineeVerification from './pages/NomineeVerification';
 import Leaderboard from './pages/Leaderboard';
+import NomineeApproval from './pages/NomineeApproval';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -35,7 +36,8 @@ function AppContent() {
         <Routes>
           {/* Default landing page route (Login) */}
           <Route path="/" element={<Login />} />
-          <Route path="/nomination" element={<NominationForm />} />
+          <Route path="/nomination" element={<ProtectedRoute requiredRole="user"><NominationForm /></ProtectedRoute>} />
+          <Route path="/nomination/approval/:token" element={<NomineeApproval />} />
 
           {/* Public Leaderboard Route */}
           <Route path="/leaderboard" element={<Leaderboard />} />
@@ -49,6 +51,15 @@ function AppContent() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminResponses />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/create-nomination"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <NominationForm backOffice />
               </ProtectedRoute>
             }
           />
