@@ -39,23 +39,23 @@ const Step3Category = ({ watch, setValue, register, formState: { errors } }) => 
     },
     {
       id: 'Sports',
-      title: 'Sports',
+      title: 'Cultural / Sports',
       icon: Trophy,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-50',
-      description: 'Athletes, players, trainers, and coaches representing at state, national, or international platforms.'
+      description: 'Individual or group achievements in culture or sports representing a community, organization, state, or nation.'
     },
     {
       id: 'Social',
-      title: 'Social',
+      title: 'Humanitarian & Social Leadership',
       icon: Heart,
       color: 'text-rose-500',
       bgColor: 'bg-rose-50',
-      description: 'Dedicated individuals leading NGOs, social organizations, humanitarian drives, and rural community welfare.'
+      description: 'Leadership benefiting children, women, peace, human rights, humanitarian work, voluntary service, and local communities.'
     },
     {
       id: 'Political',
-      title: 'Political',
+      title: 'Political, Legal & Governmental Affairs',
       icon: Building2,
       color: 'text-cyan-500',
       bgColor: 'bg-cyan-50',

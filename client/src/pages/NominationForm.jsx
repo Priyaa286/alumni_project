@@ -17,13 +17,13 @@ import Step8Declaration from '../forms/Step8Declaration';
 import Step9Review from '../forms/Step9Review';
 import Step10Submission from '../forms/Step10Submission';
 
-import { submitNomination, getNominationStatus } from '../services/api';
+import { submitNomination, createAdminNomination, getNominationStatus } from '../services/api';
 
 
 const LOCAL_STORAGE_KEY = 'nec_nomination_draft';
 
 const EMPTY_FORM_VALUES = {
-  nominationType: 'self',
+  nominationType: '',
   category: '',
   categoryDetails: {},
   accomplishments: '',
@@ -68,11 +68,13 @@ const EMPTY_FORM_VALUES = {
     nomineeName: '',
     date: '',
     place: '',
+    signature: '',
     isOtpVerified: false
   }
 };
 
-const NominationForm = () => {
+const NominationForm = ({ backOffice = false }) => {
+  const storageKey = backOffice ? `${LOCAL_STORAGE_KEY}_back_office` : LOCAL_STORAGE_KEY;
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState(null);
@@ -99,8 +101,9 @@ const NominationForm = () => {
 
   const [defaultValues] = useState(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : EMPTY_FORM_VALUES;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return JSON.parse(saved);
+      return backOffice ? { ...EMPTY_FORM_VALUES, nominationType: 'others' } : EMPTY_FORM_VALUES;
     } catch (e) {
       return EMPTY_FORM_VALUES;
     }
@@ -144,7 +147,7 @@ const NominationForm = () => {
         component: Step7Nominator, 
         fields: [
           'nominator.name', 'nominator.batch', 'nominator.department', 
-          'nominator.mobile', 'nominator.email'
+          'nominator.mobile', 'nominator.email', 'nominator.source'
         ] 
       });
     }
@@ -155,7 +158,7 @@ const NominationForm = () => {
       component: Step8Declaration, 
       fields: [
         'declaration.isDeclared', 'declaration.nomineeName', 
-        'declaration.date', 'declaration.place', 'declaration.isOtpVerified'
+        'declaration.date', 'declaration.place', 'declaration.signature', ...(backOffice ? [] : ['declaration.isOtpVerified'])
       ] 
     });
     list.push({ id: 'review', label: 'Review', component: Step9Review, fields: [] });
@@ -239,10 +242,11 @@ const NominationForm = () => {
       case 'categoryDetails':
         const cat = formValues.category;
         const details = formValues.categoryDetails || {};
+        if (!details.benefitImpact) return false;
         if (cat === 'Business') {
-          return details.annualTurnover && details.employeeStrength && details.country;
+          return details.businessType && details.position && details.employeeStrength && details.country;
         } else if (cat === 'Academic') {
-          return details.institution && details.designation && details.staffCapacity && details.leadershipAchievement;
+          return details.institution && details.institutionSector && details.designation && details.staffCapacity && details.leadershipAchievement;
         } else if (cat === 'Scientific') {
           return details.organization && details.designation && details.sector && details.address && details.publications && details.patents;
         } else if (cat === 'Sports') {
@@ -270,17 +274,20 @@ const NominationForm = () => {
         return !!formValues.necContribution?.details;
       case 'documents':
         const docs = formValues.documents || {};
-        return docs.certificates?.length > 0 && docs.achievements?.length > 0;
+        return ['identityProof', 'eligibilityProof', 'certificates', 'achievements', 'appreciationLetters', 'shortProfile']
+          .every((key) => docs[key]?.length > 0) && docs.photos?.length >= 2 &&
+          (nominationType === 'self' || (docs.nomineeDetails?.length > 0 && docs.nomineeConsent?.length > 0));
       case 'nominator':
         const nom = formValues.nominator || {};
         return (
           nom.name &&
+          nom.source &&
           /^[6-9]\d{9}$/.test(nom.mobile) &&
           /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(nom.email)
         );
       case 'declaration':
         const decl = formValues.declaration || {};
-        return decl.isDeclared && decl.nomineeName && decl.date && decl.place && decl.isOtpVerified;
+        return decl.isDeclared && decl.nomineeName && decl.date && decl.place && decl.signature && (backOffice || decl.isOtpVerified);
       case 'review':
       case 'submit':
         return true;
@@ -307,7 +314,7 @@ const NominationForm = () => {
   };
 
   const handleManualSave = () => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formValues));
+    localStorage.setItem(storageKey, JSON.stringify(formValues));
     toast.success('Progress saved as draft successfully.');
   };
 
@@ -315,10 +322,14 @@ const NominationForm = () => {
   const handleSubmitNomination = async () => {
     try {
       setIsSubmitting(true);
-      const result = await submitNomination(formValues);
+      const result = backOffice
+        ? await createAdminNomination(formValues)
+        : await submitNomination(formValues);
       setSubmittedData(result.data);
-      localStorage.removeItem(LOCAL_STORAGE_KEY); // Clear draft on successful submit
-      toast.success('Nomination submitted successfully!');
+      localStorage.removeItem(storageKey); // Clear draft on successful submit
+      toast.success(backOffice
+        ? (result.message || 'Nomination saved. An approval email was sent to the nominee.')
+        : 'Nomination submitted successfully!');
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || 'Failed to submit nomination. Please try again.');
@@ -329,8 +340,8 @@ const NominationForm = () => {
 
   // Reset form and go back to step 1
   const handleReset = () => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-    reset(EMPTY_FORM_VALUES, {
+    localStorage.removeItem(storageKey);
+    reset(backOffice ? { ...EMPTY_FORM_VALUES, nominationType: 'others' } : EMPTY_FORM_VALUES, {
       keepDefaultValues: false,
       keepValues: false,
       keepErrors: false,
@@ -355,7 +366,7 @@ const NominationForm = () => {
 
   const activeStep = activeSteps[currentStep - 1] || activeSteps[0];
 
-  if (!checkingStatus && !isFormOpen) {
+  if (!backOffice && !checkingStatus && !isFormOpen) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 text-center space-y-6">
         <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-10 border border-slate-200/80 shadow-2xl space-y-6">
@@ -404,6 +415,7 @@ const NominationForm = () => {
 
     <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       {/* ProgressBar */}
+      {backOffice && <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">Back-office nomination: the nominee will be asked to approve the completed details by email.</div>}
       <ProgressBar currentStep={currentStep} totalSteps={activeSteps.length} />
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -433,7 +445,7 @@ const NominationForm = () => {
                   {activeStep.id === 'necContribution' && <Step5NECContribution register={register} formState={formState} watch={watch} setValue={setValue} />}
                   {activeStep.id === 'documents' && <Step6Documents watch={watch} setValue={setValue} />}
                   {activeStep.id === 'nominator' && <Step7Nominator register={register} formState={formState} />}
-                  {activeStep.id === 'declaration' && <Step8Declaration register={register} watch={watch} setValue={setValue} formState={formState} />}
+                  {activeStep.id === 'declaration' && <Step8Declaration register={register} watch={watch} setValue={setValue} formState={formState} backOffice={backOffice} />}
                   {activeStep.id === 'review' && <Step9Review watch={watch} onEditStep={handleEditStep} />}
                   {activeStep.id === 'submit' && (
                     <Step10Submission

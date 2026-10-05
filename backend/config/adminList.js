@@ -1,17 +1,21 @@
 /**
- * Administrator Email Configuration
- * 
- * ADD YOUR ADMIN EMAIL ADDRESSES HERE.
- * Any email address included in this array will be granted full 'admin' privileges
- * upon successful authentication (Email + Password or Sign in with Google).
+ * Backend administrator allowlist. Configure ADMIN_EMAILS as a comma-separated
+ * list in the server environment. Defaults support local development only.
  */
-const ADMIN_EMAILS = [
+const DEFAULT_ADMIN_EMAILS = [
   'admin@nec.edu',
   'principal@nec.edu',
   'alumni@nec.edu',
   'praga007thija@gmail.com',
   'm.priyadharshini286@gmail.com',
+  'sharumathimurugesan2006@gmail.com'
 ];
+
+const configuredAdminEmails = String(process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+const ADMIN_EMAILS = configuredAdminEmails.length ? configuredAdminEmails : DEFAULT_ADMIN_EMAILS;
 
 /**
  * Helper function to verify if an email address has admin privileges.

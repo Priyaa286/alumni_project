@@ -74,6 +74,23 @@ const Step1Nominee = ({ register, formState: { errors }, watch, setValue }) => {
             if (data.professional?.organization) {
               setValue('professional.organization', data.professional.organization, { shouldValidate: true });
             }
+            if (data.professional?.experience) {
+              setValue('professional.experience', data.professional.experience, { shouldValidate: true });
+            }
+            if (data.professional?.experienceYears) {
+              setValue('professional.experienceYears', String(data.professional.experienceYears), { shouldValidate: true });
+            }
+            if (data.professional?.profileSummary) {
+              setValue('professional.profileSummary', data.professional.profileSummary, { shouldValidate: true });
+            }
+            if (data.professional?.skills) setValue('professional.skills', data.professional.skills);
+            if (data.professional?.industries) setValue('professional.industries', data.professional.industries);
+            if (data.professional?.workHistory?.length) {
+              setValue('professional.workHistory', data.professional.workHistory);
+            }
+            if (data.contributions) {
+              setValue('nominee.contributions', data.contributions);
+            }
           }
 
           setAutofetchedName(data.name);
@@ -93,6 +110,54 @@ const Step1Nominee = ({ register, formState: { errors }, watch, setValue }) => {
 
   return (
     <div className="space-y-6">
+      {/* Nomination Type selection section */}
+      <div className="border-t border-borderlight pt-6 mt-6 flex flex-col gap-3">
+        <label className="text-base font-bold text-primary">
+          Nomination Type <span className="text-red-500">*</span>
+        </label>
+        <p className="text-xs text-slate-500">
+          Choose whether you are nominating yourself (Self Nomination) or submitting a nomination on behalf of another alumnus (Nominate Others).
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+          <label className={`w-full p-4 rounded-nec border-2 cursor-pointer transition-all flex items-center gap-3 ${
+            nominationType === 'self'
+              ? 'border-primary bg-primary/5 shadow-glow'
+              : 'border-borderlight bg-white hover:bg-slate-50'
+          }`}>
+            <input
+              type="radio"
+              value="self"
+              {...register('nominationType', { required: 'Please select a nomination type' })}
+              className="w-5 h-5 text-primary focus:ring-primary"
+            />
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-700">Self Nomination</span>
+              <span className="text-xs text-slate-400">I am nominating myself for the award.</span>
+            </div>
+          </label>
+
+          <label className={`w-full p-4 rounded-nec border-2 cursor-pointer transition-all flex items-center gap-3 ${
+            nominationType === 'others'
+              ? 'border-primary bg-primary/5 shadow-glow'
+              : 'border-borderlight bg-white hover:bg-slate-50'
+          }`}>
+            <input
+              type="radio"
+              value="others"
+              {...register('nominationType', { required: 'Please select a nomination type' })}
+              className="w-5 h-5 text-primary focus:ring-primary"
+            />
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-700">Nominate Others</span>
+              <span className="text-xs text-slate-400">I am nominating another alumnus.</span>
+            </div>
+          </label>
+        </div>
+        {errors?.nominationType && (
+          <span className="text-xs text-red-500 font-bold block mt-1">{errors.nominationType.message}</span>
+        )}
+      </div>
+
       <div className="border-b border-borderlight pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="font-heading text-xl font-bold text-primary">Nominee Details</h2>
@@ -352,53 +417,7 @@ const Step1Nominee = ({ register, formState: { errors }, watch, setValue }) => {
         </div>
       </div>
 
-      {/* Nomination Type selection section */}
-      <div className="border-t border-borderlight pt-6 mt-6 flex flex-col gap-3">
-        <label className="text-base font-bold text-primary">
-          Nomination Type <span className="text-red-500">*</span>
-        </label>
-        <p className="text-xs text-slate-500">
-          Choose whether you are nominating yourself (Self Nomination) or submitting a nomination on behalf of another alumnus (Nominate Others).
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <label className={`w-full p-4 rounded-nec border-2 cursor-pointer transition-all flex items-center gap-3 ${
-            nominationType === 'self'
-              ? 'border-primary bg-primary/5 shadow-glow'
-              : 'border-borderlight bg-white hover:bg-slate-50'
-          }`}>
-            <input
-              type="radio"
-              value="self"
-              {...register('nominationType', { required: 'Please select a nomination type' })}
-              className="w-5 h-5 text-primary focus:ring-primary"
-            />
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-slate-700">Self Nomination</span>
-              <span className="text-xs text-slate-400">I am nominating myself for the award.</span>
-            </div>
-          </label>
 
-          <label className={`w-full p-4 rounded-nec border-2 cursor-pointer transition-all flex items-center gap-3 ${
-            nominationType === 'others'
-              ? 'border-primary bg-primary/5 shadow-glow'
-              : 'border-borderlight bg-white hover:bg-slate-50'
-          }`}>
-            <input
-              type="radio"
-              value="others"
-              {...register('nominationType', { required: 'Please select a nomination type' })}
-              className="w-5 h-5 text-primary focus:ring-primary"
-            />
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-slate-700">Nominate Others</span>
-              <span className="text-xs text-slate-400">I am nominating another alumnus.</span>
-            </div>
-          </label>
-        </div>
-        {errors?.nominationType && (
-          <span className="text-xs text-red-500 font-bold block mt-1">{errors.nominationType.message}</span>
-        )}
-      </div>
     </div>
   );
 };

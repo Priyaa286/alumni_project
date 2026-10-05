@@ -6,7 +6,16 @@ import {
   Building2, GraduationCap, Mail, Phone, MapPin, Send, CheckSquare, Square, Eye, X
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { getNomination, verifyNomination, getAllNominations } from '../services/api';
+import { getNomination, verifyNomination, getAllNominations, saveReviewAssessment } from '../services/api';
+
+const REVIEW_SCORE_FIELDS = [
+  ['general', 'General'],
+  ['categoryBased', 'Category based'],
+  ['awards', 'Awards'],
+  ['contribution', 'Contribution'],
+  ['others', 'Others'],
+];
+const emptyReviewers = () => [1, 2].map(() => ({ name: '', recommendation: '', scores: Object.fromEntries(REVIEW_SCORE_FIELDS.map(([key]) => [key, ''])) }));
 
 const NomineeVerification = () => {
   const { id } = useParams();
@@ -19,6 +28,8 @@ const NomineeVerification = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [viewingDoc, setViewingDoc] = useState(null);
+  const [reviewers, setReviewers] = useState(emptyReviewers);
+  const [savingReview, setSavingReview] = useState(false);
 
   const fetchNominationData = async () => {
     setLoading(true);
@@ -27,6 +38,7 @@ const NomineeVerification = () => {
       const res = await getNomination(id);
       if (res && res.success && res.data) {
         setNomination(res.data);
+        setReviewers(res.data.reviewAssessment?.reviewers || emptyReviewers());
         if (res.data.verifiedDocuments) {
           setVerifiedDocs(new Set(res.data.verifiedDocuments));
         }
@@ -36,6 +48,7 @@ const NomineeVerification = () => {
         const found = listRes.data?.find(n => n._id === id || n.nominationId === id);
         if (found) {
           setNomination(found);
+          setReviewers(found.reviewAssessment?.reviewers || emptyReviewers());
           if (found.verifiedDocuments) {
             setVerifiedDocs(new Set(found.verifiedDocuments));
           }
@@ -144,11 +157,7 @@ const NomineeVerification = () => {
       });
 
       if (res && res.success) {
-        toast.success(
-          verificationStatus === 'Approved'
-            ? "Email send for successful verification"
-            : "Email send for rejected nomination"
-        );
+        toast.success(verificationStatus === 'Approved' ? 'Nomination approved.' : 'Nomination rejected.');
         setIsRejectModalOpen(false);
         fetchNominationData();
       } else {
@@ -159,6 +168,35 @@ const NomineeVerification = () => {
       toast.error(err.response?.data?.message || 'Failed to update status. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const updateReviewer = (reviewerIndex, field, value) => {
+    setReviewers((current) => current.map((reviewer, index) => index !== reviewerIndex ? reviewer : (
+      field.startsWith('scores.')
+        ? { ...reviewer, scores: { ...reviewer.scores, [field.slice(7)]: value } }
+        : { ...reviewer, [field]: value }
+    )));
+  };
+
+  const handleSaveReview = async () => {
+    const names = reviewers.map((reviewer) => reviewer.name.trim().toLowerCase());
+    if (!names[0] || !names[1] || names[0] === names[1] || reviewers.some((reviewer) => !reviewer.recommendation || REVIEW_SCORE_FIELDS.some(([key]) => reviewer.scores[key] === ''))) {
+      toast.error('Enter two different reviewer names, all five scores, and each recommendation.');
+      return;
+    }
+    try {
+      setSavingReview(true);
+      const response = await saveReviewAssessment(id, reviewers.map((reviewer) => ({
+        ...reviewer,
+        scores: Object.fromEntries(REVIEW_SCORE_FIELDS.map(([key]) => [key, Number(reviewer.scores[key])])),
+      })));
+      toast.success(response.message || 'Eligibility review saved.');
+      fetchNominationData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not save eligibility review.');
+    } finally {
+      setSavingReview(false);
     }
   };
 
@@ -358,7 +396,39 @@ const NomineeVerification = () => {
 
         {/* Right Column (1 Col wide) - Document Verification & Decision Control */}
         <div className="space-y-6">
-          
+
+          <section className="rounded-2xl border border-purple-200 bg-white p-5 shadow-sm space-y-4">
+            <div>
+              <h3 className="font-heading text-base font-bold text-primary">Two Reviewer Eligibility Assessment</h3>
+              <p className="mt-1 text-xs text-slate-500">Score each area from 0 to 5 (25 points maximum per reviewer), then record both recommendations.</p>
+            </div>
+            {reviewers.map((reviewer, reviewerIndex) => (
+              <fieldset key={reviewerIndex} className="space-y-3 rounded-xl border border-slate-200 p-3">
+                <legend className="px-1 text-xs font-extrabold text-slate-700">Reviewer {reviewerIndex + 1}</legend>
+                <input value={reviewer.name} onChange={(event) => updateReviewer(reviewerIndex, 'name', event.target.value)} placeholder="Reviewer full name" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                {REVIEW_SCORE_FIELDS.map(([key, label]) => (
+                  <label key={key} className="flex items-center justify-between gap-3 text-xs font-medium text-slate-600">
+                    <span>{label} (0–5)</span>
+                    <select value={reviewer.scores?.[key] ?? ''} onChange={(event) => updateReviewer(reviewerIndex, `scores.${key}`, event.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                      <option value="">Score</option>
+                      {[0, 1, 2, 3, 4, 5].map((score) => <option key={score} value={score}>{score}</option>)}
+                    </select>
+                  </label>
+                ))}
+                <label className="block text-xs font-semibold text-slate-600">Recommendation
+                  <select value={reviewer.recommendation} onChange={(event) => updateReviewer(reviewerIndex, 'recommendation', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <option value="">Choose recommendation</option>
+                    <option value="Recommend">Recommend</option>
+                    <option value="Do not recommend">Do not recommend</option>
+                  </select>
+                </label>
+                <p className="text-right text-xs font-bold text-primary">Score: {REVIEW_SCORE_FIELDS.reduce((sum, [key]) => sum + (Number(reviewer.scores?.[key]) || 0), 0)} / 25</p>
+              </fieldset>
+            ))}
+            <button type="button" onClick={handleSaveReview} disabled={savingReview} className="w-full rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingReview ? 'Saving assessment…' : 'Save both reviewer assessments'}</button>
+            <p className="text-[11px] text-slate-500">The review committee may keep non-selection reasons confidential. The award may be revoked if false information is later found.</p>
+          </section>
+
           {/* Document Verification Checkboxes Box */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 sticky top-24">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

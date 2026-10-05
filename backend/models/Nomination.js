@@ -27,6 +27,9 @@ const NominationSchema = new mongoose.Schema({
     designation: { type: String, required: true },
     organization: { type: String, required: true },
     experience: { type: String, required: true },
+    skills: [{ type: String }],
+    industries: [{ type: String }],
+    workHistory: [{ type: mongoose.Schema.Types.Mixed }],
     website: { type: String },
     profileSummary: { type: String, required: true }
   },
@@ -44,6 +47,13 @@ const NominationSchema = new mongoose.Schema({
     details: { type: String, required: true }
   },
   documents: {
+    photos: [{ type: String }],
+    identityProof: [{ type: String }],
+    eligibilityProof: [{ type: String }],
+    appreciationLetters: [{ type: String }],
+    shortProfile: [{ type: String }],
+    nomineeDetails: [{ type: String }],
+    nomineeConsent: [{ type: String }],
     certificates: [{ type: String }],
     achievements: [{ type: String }],
     organizationProfile: [{ type: String }],
@@ -56,6 +66,7 @@ const NominationSchema = new mongoose.Schema({
   },
   nominator: {
     name: { type: String, required: true },
+    source: { type: String, enum: ['Batch', 'Chapter', 'Fellow Alumni'] },
     batch: { type: String },
     department: { type: String },
     mobile: { type: String, required: true },
@@ -66,32 +77,41 @@ const NominationSchema = new mongoose.Schema({
     nomineeName: { type: String, required: true },
     date: { type: Date, required: true },
     place: { type: String, required: true },
-    isOtpVerified: { type: Boolean, default: false },
-    signature: { type: String } // Retained as optional for backward compatibility
+    signature: { type: String, required: true } // Base64 data URL representing the signature
+  },
+  status: {
+    type: String,
+    enum: ['Draft', 'Submitted'],
+    default: 'Submitted'
   },
   verificationStatus: {
     type: String,
     enum: ['Not Verified', 'Approved', 'Rejected'],
     default: 'Not Verified'
   },
-  rejectionReason: {
+  rejectionReason: { type: String, default: '' },
+  verifiedDocuments: [{ type: String }],
+  awardResult: {
     type: String,
-    default: ''
+    enum: ['Undecided', 'Winner', 'NotAwarded', 'Revoked'],
+    default: 'Undecided'
   },
-  verifiedDocuments: [{
-    type: String
-  }],
-  score: {
-    type: Number,
-    default: 0
-  },
-  status: {
+  awardRevocationReason: { type: String, default: '' },
+  reviewAssessment: { type: mongoose.Schema.Types.Mixed, default: null },
+  awardYear: { type: Number, default: () => new Date().getFullYear() },
+  createdBy: { type: String, enum: ['applicant', 'back-office'], default: 'applicant' },
+  nomineeApprovalStatus: {
     type: String,
-    enum: ['Draft', 'Submitted', 'Under Review', 'Approved', 'Rejected'],
-    default: 'Submitted'
-  }
+    enum: ['NotRequired', 'Pending', 'Approved', 'Declined'],
+    default: 'NotRequired'
+  },
+  approvalTokenHash: { type: String, default: '' },
+  approvalTokenExpiresAt: { type: Date, default: null }
 }, {
   timestamps: true
 });
+
+NominationSchema.index({ 'nominee.email': 1, awardResult: 1 });
+NominationSchema.index({ approvalTokenHash: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Nomination', NominationSchema);

@@ -1,8 +1,55 @@
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
+const { parseCsv } = require('../utils/parseCsv');
 
 let membersEmailMap = null;
+const activityCsvCache = new Map();
+
+const readActivityCsv = (filename) => {
+  const filePath = path.resolve(filename);
+  try {
+    const stat = fs.statSync(filePath);
+    const cached = activityCsvCache.get(filePath);
+    if (cached?.modifiedAt === stat.mtimeMs) return cached.rows;
+    const rows = parseCsv(fs.readFileSync(filePath, 'utf8'));
+    activityCsvCache.set(filePath, { modifiedAt: stat.mtimeMs, rows });
+    return rows;
+  } catch {
+    return [];
+  }
+};
+
+const activityCsvPath = (envName, defaultName) => {
+  const configuredPath = process.env[envName];
+  if (!configuredPath) return path.resolve(__dirname, '../data/private', defaultName);
+  return path.isAbsolute(configuredPath) ? configuredPath : path.resolve(__dirname, '..', configuredPath);
+};
+
+const findMemberByEmail = async (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return null;
+  if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    try {
+      const escapedEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const emailMatch = new RegExp(`^${escapedEmail}$`, 'i');
+      const found = await mongoose.connection.db.collection('members').findOne({
+        $or: [
+          { 'basic.email_id': emailMatch },
+          { 'basic.alternate_email_id': emailMatch },
+          { 'contact_details.email': emailMatch },
+          { 'contact_details.email_id': emailMatch },
+        ],
+      });
+      if (found) return found;
+    } catch (dbErr) {
+      console.warn('[Member Lookup] DB search notice:', dbErr.message);
+    }
+  }
+  return loadMembersJson().get(normalizedEmail) || null;
+};
+
+exports.isKnownAlumniEmail = async (email) => Boolean(await findMemberByEmail(email));
 
 // Helper to locate and load test.members.json immediately
 const loadMembersJson = () => {
@@ -104,6 +151,29 @@ const formatMemberData = (member) => {
   const memDetails = member.membership_details?.[0]?.details?.[0] || member.education_details?.[0] || {};
   const workDetails = member.work_details?.[0] || {};
   const profDetails = member.professional_details || {};
+  const workHistory = (Array.isArray(member.work_details) ? member.work_details : []).map((work) => ({
+    organization: work?.name || '',
+    designation: work?.position || '',
+    department: work?.department || '',
+    startYear: work?.start_year || '',
+    endYear: work?.current_company ? 'Present' : (work?.end_year || ''),
+    isCurrent: Boolean(work?.current_company),
+  }));
+
+  const toActivityList = (...sources) => sources
+    .filter(Array.isArray)
+    .flat()
+    .map((entry) => !entry ? null : typeof entry === 'string' ? { description: entry } : {
+      title: entry.title || entry.name || entry.topic || '',
+      description: entry.description || entry.details || '',
+      date: entry.date || entry.event_date || '',
+      organization: entry.organization || entry.institution || '',
+      participants: entry.participants || entry.attendees || '',
+    })
+    .filter((entry) => entry && Object.values(entry).some(Boolean));
+
+  const mentoring = toActivityList(member.mentorship_details, member.mentorships, member.activities?.mentoring);
+  const webinars = toActivityList(member.webinar_details, member.webinars, member.activities?.webinars);
 
   const batchYear = extractBatchYear(member);
 
@@ -162,8 +232,16 @@ const formatMemberData = (member) => {
   // Extract Experience
   let experience = '';
   if (profDetails.experience_years) {
-    experience = `${profDetails.experience_years} Years`;
+    experience = String(profDetails.experience_years);
   }
+
+  const workSummary = workHistory
+    .map((work) => `${[work.designation, work.organization].filter(Boolean).join(' at ')}${work.startYear ? ` (${work.startYear}–${work.endYear || 'Present'})` : ''}`)
+    .filter(Boolean)
+    .join('; ');
+  const profileSummary = [workSummary, Array.isArray(profDetails.skills) && profDetails.skills.length ? `Skills: ${profDetails.skills.join(', ')}` : '']
+    .filter(Boolean)
+    .join('. ');
 
   return {
     name: basic.name || '',
@@ -180,8 +258,135 @@ const formatMemberData = (member) => {
     professional: {
       designation: workDetails.position || '',
       organization: workDetails.name || '',
-      experience: experience
+      experience: experience,
+      experienceYears: profDetails.experience_years || '',
+      skills: Array.isArray(profDetails.skills) ? profDetails.skills : [],
+      industries: Array.isArray(profDetails.industries) ? profDetails.industries : [],
+      workHistory,
+      profileSummary,
+    },
+    contributions: { mentoring, webinars },
+  };
+};
+
+const loadMemberActivities = async (email) => {
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const emailRecords = (record) => {
+    const emails = [record.email, record.alumniEmail, record.alumni_email, record.memberEmail, record.member_email,
+      record.alumni?.email, record.member?.email];
+    return emails.some((value) => String(value || '').trim().toLowerCase() === normalizedEmail);
+  };
+  const normalize = (record) => ({
+    title: String(record.title || record.name || record.topic || record.event_name || ''),
+    description: String(record.description || record.details || record.summary || ''),
+    date: String(record.date || record.event_date || record.webinar_date || ''),
+    organization: String(record.organization || record.institution || record.department || ''),
+    participants: String(record.participants || record.attendees || record.attendee_count || ''),
+    venue: String(record.venue || record.webinarVenue || ''),
+    speakerName: String(record.speakerName || ''),
+    designation: String(record.designation || ''),
+  });
+  const readMongoActivities = async (names, match) => {
+    if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) return [];
+    for (const name of names) {
+      try {
+        const records = await mongoose.connection.db.collection(name).find(match).limit(100).toArray();
+        if (records.length) return records;
+      } catch (error) {
+        console.warn(`[Member Activities] Could not read ${name}:`, error.message);
+      }
     }
+    return [];
+  };
+
+  const escapedEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const emailMatch = new RegExp(`^${escapedEmail}$`, 'i');
+  const emailMatchQuery = { $or: [
+    { email: emailMatch }, { alumniEmail: emailMatch }, { alumni_email: emailMatch },
+    { memberEmail: emailMatch }, { member_email: emailMatch },
+    { 'alumni.email': emailMatch }, { 'member.email': emailMatch },
+  ] };
+  const [mongoMentoring, mongoWebinars] = await Promise.all([
+    readMongoActivities(['mentorships', 'mentoring', 'mentorship_records'], emailMatchQuery),
+    readMongoActivities(['webinars', 'webinar_records', 'guest_lectures'], emailMatchQuery),
+  ]);
+
+  const webinarCsvRecords = readActivityCsv(activityCsvPath('WEBINAR_SPEAKERS_CSV', 'webinar.speakers.csv'))
+    .filter((record) => String(record.email || '').trim().toLowerCase() === normalizedEmail)
+    .map((record) => normalize({
+      title: record.topic || record.domain,
+      description: [
+        record.domain && `Domain: ${record.domain}`,
+        record.name && `Speaker: ${record.name}`,
+        record.speakerPhoto && `Speaker photo: ${record.speakerPhoto}`,
+        record.department && `Department: ${record.department}`,
+        record.batch && `Batch: ${record.batch}`,
+        record.alumniCity && `Alumni city: ${record.alumniCity}`,
+        record.meetingLink && `Meeting link: ${record.meetingLink}`,
+        record.phaseId && `Phase: ${record.phaseId}`,
+        record['slots[0].time'] && `Time: ${record['slots[0].time']}`,
+        record['slots[0].deadline'] && `Deadline: ${record['slots[0].deadline']}`,
+      ].filter(Boolean).join(' — '),
+      date: record['slots[0].webinarDate'],
+      organization: record.companyName || 'National Engineering College',
+      venue: record.webinarVenue,
+      speakerName: record.name,
+      designation: record.designation,
+    }));
+
+  // Mentor registrations contain only mentor_id; resolve that key through the mentor profile collection.
+  const assignedRegistrations = readActivityCsv(activityCsvPath('MENTOR_REGISTRATIONS_CSV', 'mentorship.mentorregistrations.csv'))
+    .filter((record) => String(record.status || '').trim().toLowerCase() === 'assigned');
+  let csvMentoringRecords = [];
+  if (assignedRegistrations.length && mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    const mentorIds = [...new Set(assignedRegistrations.map((record) => String(record.mentor_id || '').trim()).filter(Boolean))];
+    const objectIds = mentorIds.filter((id) => mongoose.isValidObjectId(id)).map((id) => new mongoose.Types.ObjectId(id));
+    const collectionNames = process.env.MENTOR_PROFILE_COLLECTION
+      ? [process.env.MENTOR_PROFILE_COLLECTION]
+      : ['mentors', 'mentor_profiles', 'alumni_mentors', 'mentorusers', 'users', 'members'];
+    for (const collectionName of collectionNames) {
+      try {
+        const profiles = await mongoose.connection.db.collection(collectionName).find({
+          $or: [
+            ...(objectIds.length ? [{ _id: { $in: objectIds } }] : []),
+            { _id: { $in: mentorIds } },
+          ],
+        }).toArray();
+        if (!profiles.length) continue;
+        const profileEmails = new Map();
+        profiles.forEach((profile) => {
+          const id = String(profile._id);
+          const profileEmail = profile.email || profile.email_id || profile.emailId || profile.basic?.email_id ||
+            profile.contact_details?.email || profile.contact_details?.email_id;
+          if (profileEmail) profileEmails.set(id, String(profileEmail).trim().toLowerCase());
+        });
+        csvMentoringRecords = assignedRegistrations
+          .filter((record) => profileEmails.get(String(record.mentor_id || '').trim()) === normalizedEmail)
+          .map((record) => {
+            const areas = Object.entries(record).filter(([key, value]) => /^areas_of_interest\[\d+\]$/.test(key) && value.trim()).map(([, value]) => value.trim());
+            return normalize({
+              title: 'NEC Alumni Mentorship',
+              description: [record.description, areas.length && `Areas: ${areas.join(', ')}`, record.status && `Status: ${record.status}`, record.phaseId && `Phase: ${record.phaseId}`].filter(Boolean).join('. '),
+              date: record.assignedDate || record.createdAt,
+              organization: 'National Engineering College',
+            });
+          });
+        if (profileEmails.size) break;
+      } catch (error) {
+        console.warn(`[Member Activities] Could not resolve mentor profiles in ${collectionName}:`, error.message);
+      }
+    }
+  }
+
+  const uniqueRecords = (records) => [...new Map(records.map((record) => [
+    [record.title, record.description, record.date, record.organization].join('|'), record,
+  ])).values()];
+  const csvMentoring = csvMentoringRecords;
+  const emailMentoring = readActivityCsv(activityCsvPath('MENTOR_REGISTRATIONS_CSV', 'mentorship.mentorregistrations.csv'))
+    .filter(emailRecords).map(normalize);
+  return {
+    mentoring: uniqueRecords([...mongoMentoring, ...emailMentoring, ...csvMentoring].map(normalize)),
+    webinars: uniqueRecords([...mongoWebinars, ...webinarCsvRecords].map(normalize)),
   };
 };
 
@@ -198,26 +403,8 @@ exports.lookupMemberByEmail = async (req, res) => {
     }
 
     const queryEmail = String(email).trim().toLowerCase();
-    let foundMember = null;
-
-    // 1. Search in-memory JSON index first (super-fast 12,049 member index)
-    const map = loadMembersJson();
-    foundMember = map.get(queryEmail);
-
-    // 2. Fallback to MongoDB if connected and not found in JSON index
-    if (!foundMember && mongoose.connection.readyState === 1 && mongoose.connection.db) {
-      try {
-        const db = mongoose.connection.db;
-        foundMember = await db.collection('members').findOne({
-          $or: [
-            { 'basic.email_id': new RegExp(`^${queryEmail}$`, 'i') },
-            { 'basic.alternate_email_id': new RegExp(`^${queryEmail}$`, 'i') }
-          ]
-        });
-      } catch (dbErr) {
-        console.warn('[Member Lookup] DB search notice:', dbErr.message);
-      }
-    }
+    // Prefer MongoDB so current professional and contact details take precedence.
+    const foundMember = await findMemberByEmail(queryEmail);
 
     if (!foundMember) {
       return res.status(404).json({
@@ -237,6 +424,25 @@ exports.lookupMemberByEmail = async (req, res) => {
     }
 
     const formattedData = formatMemberData(foundMember);
+    const matchingSpeakerRecords = readActivityCsv(activityCsvPath('WEBINAR_SPEAKERS_CSV', 'webinar.speakers.csv'))
+      .filter((record) => String(record.email || '').trim().toLowerCase() === queryEmail)
+      .sort((left, right) => new Date(right.updatedAt || right.createdAt || 0) - new Date(left.updatedAt || left.createdAt || 0));
+    const speakerRecord = matchingSpeakerRecords[0];
+    if (speakerRecord) {
+      formattedData.name ||= speakerRecord.name || '';
+      formattedData.department ||= speakerRecord.department || '';
+      const speakerPhone = String(speakerRecord.phoneNumber || '').replace(/\D/g, '').slice(-10);
+      if (!formattedData.mobile && /^[6-9]\d{9}$/.test(speakerPhone)) formattedData.mobile = speakerPhone;
+      formattedData.professional.designation ||= speakerRecord.designation || '';
+      formattedData.professional.organization ||= speakerRecord.companyName || '';
+    }
+    const databaseActivities = await loadMemberActivities(queryEmail);
+    if (databaseActivities.mentoring.length) {
+      formattedData.contributions.mentoring = [...formattedData.contributions.mentoring, ...databaseActivities.mentoring];
+    }
+    if (databaseActivities.webinars.length) {
+      formattedData.contributions.webinars = [...formattedData.contributions.webinars, ...databaseActivities.webinars];
+    }
 
     return res.status(200).json({
       success: true,

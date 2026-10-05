@@ -1,7 +1,10 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 
 const Step2Professional = ({ register, formState: { errors }, watch }) => {
   const profileSummary = watch('professional.profileSummary') || '';
+  const workHistory = watch('professional.workHistory') || [];
+  const skills = watch('professional.skills') || [];
+  const industries = watch('professional.industries') || [];
 
   // Calculate word count dynamically
   const getWordCount = (text) => {
@@ -102,6 +105,39 @@ const Step2Professional = ({ register, formState: { errors }, watch }) => {
           )}
         </div>
       </div>
+
+      {workHistory.length > 0 && (
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">Work history fetched from alumni records</h3>
+            <p className="text-xs text-slate-500">You can correct any organization, designation, or dates below.</p>
+          </div>
+          {workHistory.map((work, index) => (
+            <div key={`${index}-${work.organization || ''}`} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+              <label className="text-xs font-semibold text-slate-600">Designation
+                <input {...register(`professional.workHistory.${index}.designation`)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">Organization
+                <input {...register(`professional.workHistory.${index}.organization`)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">From
+                <input {...register(`professional.workHistory.${index}.startYear`)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">To
+                <input {...register(`professional.workHistory.${index}.endYear`)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800" />
+              </label>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {(skills.length > 0 || industries.length > 0) && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
+          {skills.length > 0 && <p><strong>Skills:</strong> {skills.join(', ')}</p>}
+          {industries.length > 0 && <p className="mt-1"><strong>Industries:</strong> {industries.join(', ')}</p>}
+          <p className="mt-2 text-slate-500">These records are included in the editable professional summary below.</p>
+        </div>
+      )}
 
       {/* Brief Professional Profile */}
       <div className="flex flex-col gap-2">

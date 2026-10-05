@@ -2,82 +2,150 @@ const Nomination = require('../models/Nomination');
 const Counter = require('../models/Counter');
 const Setting = require('../models/Setting');
 const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
-const { sendNominationFormOpenEmail } = require('../utils/sendEmail');
+const crypto = require('crypto');
+const { verifySignedToken } = require('../utils/signedToken');
+const { sendNomineeApprovalEmail } = require('../utils/sendEmail');
+const memberController = require('./memberController');
+const { isServingCommitteeMember } = require('../config/committeeList');
 
 // In-Memory Storage Fallback (used when local MongoDB server is not running)
 const inMemoryNominations = new Map();
 let inMemorySeq = 0;
-let inMemoryFormOpen = true; // Default form open status
+
+const readNominationWindow = async () => {
+  const setting = mongoose.connection.readyState === 1
+    ? await Setting.findOne({ key: 'nominationWindow' }).lean()
+    : null;
+  const window = setting?.value || null;
+  if (!window?.startAt || !window?.endAt) return { isOpen: false, startAt: null, endAt: null };
+  const now = Date.now();
+  const startAt = new Date(window.startAt).getTime();
+  const endAt = new Date(window.endAt).getTime();
+  return {
+    isOpen: Number.isFinite(startAt) && Number.isFinite(endAt) && now >= startAt && now <= endAt,
+    startAt: window.startAt,
+    endAt: window.endAt,
+  };
+};
+
+const nomineeHasWon = async (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (mongoose.connection.readyState === 1) {
+    const escapedEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return Boolean(await Nomination.exists({ 'nominee.email': new RegExp(`^${escapedEmail}$`, 'i'), awardResult: { $in: ['Winner', 'Revoked'] } }));
+  }
+  return Array.from(new Set(inMemoryNominations.values())).some((item) =>
+    String(item.nominee?.email || '').trim().toLowerCase() === normalizedEmail && ['Winner', 'Revoked'].includes(item.awardResult));
+};
+
+const nomineeWasNotAwardedWithinTwoYears = async (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const escapedEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const currentYear = new Date().getFullYear();
+  let previous = null;
+  if (mongoose.connection.readyState === 1) {
+    previous = await Nomination.findOne({
+      'nominee.email': new RegExp(`^${escapedEmail}$`, 'i'),
+      awardResult: 'NotAwarded',
+    }).sort({ awardYear: -1, createdAt: -1 }).select('awardYear').lean();
+  } else {
+    previous = Array.from(new Set(inMemoryNominations.values()))
+      .filter((item) => String(item.nominee?.email || '').trim().toLowerCase() === normalizedEmail && item.awardResult === 'NotAwarded')
+      .sort((left, right) => Number(right.awardYear || 0) - Number(left.awardYear || 0))[0];
+  }
+  return previous?.awardYear && currentYear - Number(previous.awardYear) < 2 ? Number(previous.awardYear) : null;
+};
+
+const hasRequiredCategoryDetails = (category, details = {}) => {
+  if (!details.benefitImpact) return false;
+  const requiredByCategory = {
+    Business: ['businessType', 'position', 'employeeStrength', 'country'],
+    Academic: ['institution', 'institutionSector', 'designation', 'staffCapacity', 'leadershipAchievement'],
+    Scientific: ['organization', 'designation', 'sector', 'address', 'publications', 'patents'],
+    Sports: ['organization', 'designation', 'level', 'achievement'],
+    Social: ['trust', 'sector', 'level', 'address', 'achievement'],
+    Political: ['trust', 'designation', 'level', 'address', 'achievement'],
+    'Retired Service Personnel': ['serviceType', 'serviceNumber', 'rank', 'unit', 'branch', 'joiningDate', 'retirementDate', 'yearsOfService', 'serviceBook', 'exServiceId'],
+  };
+  const required = requiredByCategory[category];
+  return Boolean(required && required.every((key) => details[key] !== undefined && details[key] !== null && String(details[key]).trim() !== ''));
+};
 
 // Create a new Nomination
 exports.createNomination = async (req, res) => {
   try {
-    // Check if Nomination Form is Open
-    let isOpen = inMemoryFormOpen;
-    if (mongoose.connection.readyState === 1) {
-      const formSetting = await Setting.findOne({ key: 'nomination_form_open' });
-      if (formSetting !== null && formSetting !== undefined) {
-        isOpen = Boolean(formSetting.value);
+    const isBackOffice = req.isBackOffice === true;
+    if (!isBackOffice) {
+      const window = await readNominationWindow();
+      if (!window.isOpen) return res.status(403).json({ success: false, message: 'The nomination period is currently closed.' });
+
+      const verification = verifySignedToken(req.body.declaration?.verificationToken);
+      const nomineeEmail = String(req.body.nominee?.email || '').trim().toLowerCase();
+      if (!verification || verification.purpose !== 'nominee-email-verification' || verification.email !== nomineeEmail) {
+        return res.status(403).json({ success: false, message: 'Verify the nominee email before submitting this nomination.' });
       }
     }
 
-    if (!isOpen) {
-      return res.status(403).json({
+    const nomineeEmail = String(req.body.nominee?.email || '').trim().toLowerCase();
+    if (!nomineeEmail) return res.status(400).json({ success: false, message: 'Nominee email is required.' });
+    if (!['self', 'others'].includes(req.body.nominationType)) {
+      return res.status(400).json({ success: false, message: 'Choose self-nomination or nomination by another alumnus.' });
+    }
+    if (!(await memberController.isKnownAlumniEmail(nomineeEmail))) {
+      return res.status(400).json({ success: false, message: 'The nominee must be present in the NEC alumni records to meet the eligibility rules.' });
+    }
+    const nominatorEmail = String(req.body.nominator?.email || req.user?.email || '').trim().toLowerCase();
+    if ([nomineeEmail, nominatorEmail, req.user?.email].some(isServingCommitteeMember)) {
+      return res.status(403).json({ success: false, message: 'Serving Notable Alumni Committee members cannot be nominated or submit nominations.' });
+    }
+    if (await nomineeHasWon(nomineeEmail)) {
+      return res.status(409).json({ success: false, message: 'This alumnus has already received the award and cannot be nominated again.' });
+    }
+    const notAwardedYear = await nomineeWasNotAwardedWithinTwoYears(nomineeEmail);
+    if (notAwardedYear) {
+      return res.status(409).json({
         success: false,
-        message: 'The nomination form is currently closed by the Admin. Submissions are no longer accepted.'
+        message: `This nominee was not selected in ${notAwardedYear} and may reapply after two years.`,
       });
     }
-
-    const nomineeEmail = (req.body.nominee?.email || req.body.email || '').trim().toLowerCase();
-
-    const nomineeMobile = (req.body.nominee?.mobile || req.body.mobile || '').trim();
-    const nomineeName = (req.body.nominee?.name || req.body.nominee?.fullName || req.body.nomineeName || '').trim().toLowerCase();
-
-    // Check for duplicate nomination entry
-    if (mongoose.connection.readyState === 1) {
-      const orConditions = [];
-      if (nomineeEmail) orConditions.push({ 'nominee.email': nomineeEmail }, { email: nomineeEmail });
-      if (nomineeMobile) orConditions.push({ 'nominee.mobile': nomineeMobile }, { mobile: nomineeMobile });
-      if (nomineeName) {
-        orConditions.push({ 'nominee.name': { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
-        orConditions.push({ 'nominee.fullName': { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
-        orConditions.push({ nomineeName: { $regex: new RegExp(`^${nomineeName}$`, 'i') } });
-      }
-
-      if (orConditions.length > 0) {
-        const existingNomination = await Nomination.findOne({ $or: orConditions });
-        if (existingNomination) {
-          return res.status(400).json({
-            success: false,
-            message: 'A nomination for this nominee has already been submitted. Duplicate entries are not allowed.'
-          });
-        }
+    const declaration = req.body.declaration || {};
+    if (!declaration.signature || !declaration.isDeclared) {
+      return res.status(400).json({ success: false, message: 'A signed application and declaration are required.' });
+    }
+    if (!hasRequiredCategoryDetails(req.body.category, req.body.categoryDetails)) {
+      return res.status(400).json({ success: false, message: 'Complete the category criteria and describe the impact of the nominee’s achievement.' });
+    }
+    const documents = req.body.documents || {};
+    const requiredDocumentKeys = ['photos', 'identityProof', 'eligibilityProof', 'certificates', 'achievements', 'appreciationLetters', 'shortProfile'];
+    const missingDocuments = requiredDocumentKeys.filter((key) => !Array.isArray(documents[key]) || documents[key].length < (key === 'photos' ? 2 : 1));
+    if (req.body.nominationType === 'others') {
+      ['nomineeDetails', 'nomineeConsent'].forEach((key) => {
+        if (!Array.isArray(documents[key]) || documents[key].length < 1) missingDocuments.push(key);
+      });
+      if (!['Batch', 'Chapter', 'Fellow Alumni'].includes(req.body.nominator?.source)) {
+        return res.status(400).json({ success: false, message: 'Choose whether this nomination is from a batch, chapter, or fellow alumnus.' });
       }
     }
-
-    // Check in-memory store for duplicate
-    for (const item of inMemoryNominations.values()) {
-      if (!item) continue;
-      const existingEmail = (item.nominee?.email || item.email || '').trim().toLowerCase();
-      const existingMobile = (item.nominee?.mobile || item.mobile || '').trim();
-      const existingName = (item.nominee?.name || item.nominee?.fullName || item.nomineeName || '').trim().toLowerCase();
-
-      if (
-        (nomineeEmail && existingEmail && nomineeEmail === existingEmail) ||
-        (nomineeMobile && existingMobile && nomineeMobile === existingMobile) ||
-        (nomineeName && existingName && nomineeName === existingName)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: 'A nomination for this nominee has already been submitted. Duplicate entries are not allowed.'
-        });
-      }
+    if (missingDocuments.length) {
+      return res.status(400).json({ success: false, message: 'Upload all required application documents before submitting.' });
     }
 
     const currentYear = new Date().getFullYear();
     let nominationId;
     let savedNomination;
+    const approvalToken = isBackOffice ? crypto.randomBytes(32).toString('hex') : null;
+    const nominationData = { ...req.body };
+    if (nominationData.declaration) {
+      nominationData.declaration = { ...nominationData.declaration };
+      delete nominationData.declaration.verificationToken;
+      delete nominationData.declaration.verifiedEmail;
+      delete nominationData.declaration.isOtpVerified;
+    }
+    nominationData.nominee.email = nomineeEmail;
+    nominationData.createdBy = isBackOffice ? 'back-office' : 'applicant';
+    nominationData.nomineeApprovalStatus = isBackOffice ? 'Pending' : 'NotRequired';
+    nominationData.approvalTokenHash = approvalToken ? crypto.createHash('sha256').update(approvalToken).digest('hex') : '';
+    nominationData.approvalTokenExpiresAt = approvalToken ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : null;
 
     if (mongoose.connection.readyState === 1) {
       const counterId = `nomination_${currentYear}`;
@@ -90,21 +158,16 @@ exports.createNomination = async (req, res) => {
       const sequenceNumber = String(counter.seq).padStart(4, '0');
       nominationId = `NOM-${currentYear}-${sequenceNumber}`;
 
-      const nominationData = {
-        ...req.body,
+      const persistedData = {
+        ...nominationData,
         nominationId,
-        status: 'Submitted'
+        status: 'Submitted',
+        awardResult: 'Undecided',
+        awardYear: currentYear,
       };
 
-      const nomination = new Nomination(nominationData);
+      const nomination = new Nomination(persistedData);
       savedNomination = await nomination.save();
-      console.log(`[MongoDB Atlas] Nomination saved successfully with ID: ${nominationId}`);
-
-      // Sync into in-memory store so admin fetch retrieves it instantaneously
-      inMemoryNominations.set(nominationId, savedNomination.toObject ? savedNomination.toObject() : savedNomination);
-      if (savedNomination._id) {
-        inMemoryNominations.set(String(savedNomination._id), savedNomination.toObject ? savedNomination.toObject() : savedNomination);
-      }
     } else {
       // In-Memory Mode
       inMemorySeq += 1;
@@ -113,9 +176,12 @@ exports.createNomination = async (req, res) => {
 
       savedNomination = {
         _id: `mem_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-        ...req.body,
+        ...nominationData,
         nominationId,
         status: 'Submitted',
+        verificationStatus: 'Not Verified',
+        awardResult: 'Undecided',
+        awardYear: currentYear,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -124,20 +190,24 @@ exports.createNomination = async (req, res) => {
       console.log(`[In-Memory Store] Submitted nomination saved with ID: ${nominationId}`);
     }
 
-    // Mock Email/SMS placeholders
-    if (savedNomination.nominee?.email) {
-      console.log(`[Notification] Sending Confirmation Email to Nominee: ${savedNomination.nominee.email} for ID: ${nominationId}`);
-    }
-    if (savedNomination.nominee?.mobile) {
-      console.log(`[Notification] Sending Confirmation SMS to Nominee: ${savedNomination.nominee.mobile} for ID: ${nominationId}`);
-    }
-    if (savedNomination.nominator?.email) {
-      console.log(`[Notification] Sending Acknowledgment Email to Nominator: ${savedNomination.nominator.email}`);
+    let approvalEmailSent = false;
+    if (isBackOffice && approvalToken) {
+      const appUrl = process.env.APP_BASE_URL || process.env.NOMINATION_FORM_URL || 'http://localhost:3000';
+      const result = await sendNomineeApprovalEmail(
+        nomineeEmail,
+        savedNomination.nominee?.name || 'Alumnus',
+        nominationId,
+        `${appUrl.replace(/\/$/, '')}/nomination/approval/${approvalToken}`
+      );
+      approvalEmailSent = result.sent;
     }
 
     res.status(201).json({
       success: true,
-      message: 'Nomination submitted successfully',
+      message: isBackOffice
+        ? (approvalEmailSent ? 'Nomination saved and approval email sent to the nominee.' : 'Nomination saved, but the approval email could not be sent. Configure SMTP and resend it from the admin dashboard.')
+        : 'Nomination submitted successfully',
+      approvalEmailSent,
       data: savedNomination
     });
   } catch (error) {
@@ -156,11 +226,10 @@ exports.getNominationById = async (req, res) => {
     let nomination = null;
 
     if (mongoose.connection.readyState === 1) {
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        nomination = await Nomination.findById(id);
-      }
-      if (!nomination) {
+      if (id.startsWith('NOM-')) {
         nomination = await Nomination.findOne({ nominationId: id });
+      } else {
+        nomination = await Nomination.findById(id);
       }
     } else {
       nomination = inMemoryNominations.get(id) || null;
@@ -193,12 +262,7 @@ exports.updateNomination = async (req, res) => {
     let nomination = null;
 
     if (mongoose.connection.readyState === 1) {
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        nomination = await Nomination.findById(id);
-      }
-      if (!nomination) {
-        nomination = await Nomination.findOne({ nominationId: id });
-      }
+      nomination = await Nomination.findById(id) || await Nomination.findOne({ nominationId: id });
       if (!nomination) {
         return res.status(404).json({ success: false, message: 'Nomination not found' });
       }
@@ -236,13 +300,7 @@ exports.deleteNomination = async (req, res) => {
     const { id } = req.params;
 
     if (mongoose.connection.readyState === 1) {
-      let nomination = null;
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        nomination = await Nomination.findById(id);
-      }
-      if (!nomination) {
-        nomination = await Nomination.findOne({ nominationId: id });
-      }
+      let nomination = await Nomination.findById(id) || await Nomination.findOne({ nominationId: id });
       if (!nomination) {
         return res.status(404).json({ success: false, message: 'Nomination not found' });
       }
@@ -276,9 +334,9 @@ exports.getCategories = async (req, res) => {
       { id: 'Business', title: 'Business', description: 'Entrepreneurs, founders, and corporate leaders making exceptional business impact.' },
       { id: 'Academic', title: 'Academic', description: 'Scholars, professors, and researchers driving excellence in education.' },
       { id: 'Scientific', title: 'Scientific', description: 'Scientists and innovators breaking frontiers in technology and science.' },
-      { id: 'Sports', title: 'Sports', description: 'Athletes and coaches representing at state, national, or international levels.' },
-      { id: 'Social', title: 'Social', description: 'Individuals dedicating efforts to community welfare, NGOs, and social service.' },
-      { id: 'Political', title: 'Political', description: 'Leaders contributing to public administration, governance, and policy.' },
+      { id: 'Sports', title: 'Cultural / Sports', description: 'Individual or group achievements in culture or sports representing a community, organization, state, or nation.' },
+      { id: 'Social', title: 'Humanitarian & Social Leadership', description: 'Leadership benefiting children, women, peace, human rights, humanitarian work, voluntary service, and local communities.' },
+      { id: 'Political', title: 'Political, Legal & Governmental Affairs', description: 'Achievements in political, legal, or governmental affairs, considered case by case.' },
       { id: 'Retired Service Personnel', title: 'Retired Service Personnel', description: 'Veterans from Army, Navy, Air Force, and CAPF who served the nation.' }
     ];
 
@@ -294,403 +352,268 @@ exports.getCategories = async (req, res) => {
   }
 };
 
-// Get All Nominations (Admin Dashboard endpoint)
 exports.getAllNominations = async (req, res) => {
   try {
-    let dbNominations = [];
-    if (mongoose.connection.readyState === 1) {
-      dbNominations = await Nomination.find().sort({ createdAt: -1 });
-    }
-
-    const memNominations = Array.from(inMemoryNominations.values());
-
-    // Merge DB records and Memory records deduplicated by nominee email / name
-    const combined = [...dbNominations, ...memNominations];
-    const map = new Map();
-    combined.forEach(item => {
-      if (!item) return;
-      const email = (item.nominee?.email || item.email || '').trim().toLowerCase();
-      const name = (item.nominee?.name || item.nominee?.fullName || item.nomineeName || '').trim().toLowerCase();
-      const key = email || name || item.nominationId || String(item._id);
-      if (!map.has(key)) {
-        map.set(key, item.toObject ? item.toObject() : item);
-      }
-    });
-
-    const nominations = Array.from(map.values());
-
-    return res.status(200).json({
-      success: true,
-      count: nominations.length,
-      data: nominations
-    });
+    const data = mongoose.connection.readyState === 1
+      ? await Nomination.find().sort({ createdAt: -1 }).lean()
+      : Array.from(new Set(inMemoryNominations.values())).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching nominations:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve nominations'
-    });
+    res.status(500).json({ success: false, message: 'Could not load nominations.' });
   }
 };
 
-// Helper to calculate score for Leaderboard ranking
-const calculateNomineeScore = (data) => {
-  let score = 0;
-  // 1. Contribution activities count (25 pts per activity)
-  const activities = data.necContribution?.activities || [];
-  score += activities.length * 25;
-
-  // 2. Additional contribution details length bonus
-  const details = data.necContribution?.details || '';
-  if (details.length > 50) score += 15;
-  if (details.length > 150) score += 15;
-
-  // 3. Work Experience (5 pts per year, max 100 pts)
-  const expStr = data.professional?.experience || '0';
-  const expYears = parseInt(expStr, 10);
-  if (!isNaN(expYears)) {
-    score += Math.min(expYears * 5, 100);
-  }
-
-  // 4. Verified Documents bonus (15 pts per verified doc)
-  const verifiedDocs = data.verifiedDocuments || [];
-  score += verifiedDocs.length * 15;
-
-  // 5. Registered Alumni Bonus (20 pts)
-  if (data.nominee?.isRegisteredAlumni === 'Yes') {
-    score += 20;
-  }
-
-  return score;
-};
-
-// Helper to send decision email notification
-const sendDecisionEmail = async (nomineeEmail, nomineeName, decision, rejectionReason = '') => {
-  if (!nomineeEmail) return;
-
-  try {
-    let transporter = null;
-    let from = `"NEC Alumni Association" <no-reply@nec.edu.in>`;
-
-    if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-      const gmailUser = process.env.GMAIL_USER.trim();
-      const gmailPass = process.env.GMAIL_PASS.replace(/\s+/g, '');
-      transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user: gmailUser, pass: gmailPass },
-      });
-      from = `"NEC Alumni Association" <${gmailUser}>`;
-    } else if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST.trim(),
-        port: Number(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: { user: process.env.SMTP_USER.trim(), pass: process.env.SMTP_PASS.trim() },
-      });
-      from = process.env.SMTP_FROM || `"NEC Alumni Association" <${process.env.SMTP_USER.trim()}>`;
-    }
-
-    if (!transporter) {
-      console.log(`[DECISION MAIL LOG] Mail for: ${nomineeEmail} | Decision: ${decision}`);
-      return;
-    }
-
-    if (decision === 'Approved') {
-      await transporter.sendMail({
-        from,
-        to: nomineeEmail,
-        subject: 'Congratulations! Your Details Verified - NEC Notable Alumni Award',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #8A2BE2; text-align: center; margin-bottom: 8px;">NATIONAL ENGINEERING COLLEGE</h2>
-            <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 0;">NOTABLE ALUMNI AWARD PORTAL</p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 16px; color: #1e293b;">Dear <strong>${nomineeName}</strong>,</p>
-            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #166534; margin: 0 0 8px 0; font-size: 16px;">🎉 Nomination Details Verified & Approved!</h3>
-              <p style="color: #15803d; font-size: 14px; margin: 0; line-height: 1.5;">
-                Your details are successfully verified and You're eligible for ranking in the Notable Alumni Award Leaderboard!
-              </p>
-            </div>
-            <p style="font-size: 14px; color: #475569;">
-              Thank you for your outstanding professional accomplishments and invaluable contributions to National Engineering College.
-            </p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 12px; color: #94a3b8; text-align: center;">
-              National Engineering College, K.R. Nagar, Kovilpatti - 628 503
-            </p>
-          </div>
-        `,
-      });
-      console.log(`[APPROVAL EMAIL SENT] Sent approval email to ${nomineeEmail}`);
-    } else if (decision === 'Rejected') {
-      await transporter.sendMail({
-        from,
-        to: nomineeEmail,
-        subject: 'Update on Your Nomination - NEC Notable Alumni Award',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #8A2BE2; text-align: center; margin-bottom: 8px;">NATIONAL ENGINEERING COLLEGE</h2>
-            <p style="text-align: center; color: #64748b; font-size: 13px; margin-top: 0;">NOTABLE ALUMNI AWARD PORTAL</p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 16px; color: #1e293b;">Dear <strong>${nomineeName}</strong>,</p>
-            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
-              Thank you for submitting your nomination details for the Notable Alumni Award.
-            </p>
-            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
-              After careful review of your submitted documents and records, we regret to inform you that your nomination could not be approved at this time.
-            </p>
-            <div style="background-color: #fff1f2; border: 1px solid #fecdd3; padding: 16px; border-radius: 8px; margin: 20px 0;">
-              <h4 style="color: #9f1239; margin: 0 0 6px 0; font-size: 14px;">Reason for Rejection / Disqualification:</h4>
-              <p style="color: #be123c; font-size: 13px; margin: 0; font-weight: 600;">
-                ${rejectionReason || 'Submitted documents or details could not be verified against the official records.'}
-              </p>
-            </div>
-            <p style="font-size: 14px; color: #475569;">
-              We sincerely appreciate your participation and continued engagement with National Engineering College.
-            </p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 12px; color: #94a3b8; text-align: center;">
-              National Engineering College, K.R. Nagar, Kovilpatti - 628 503
-            </p>
-          </div>
-        `,
-      });
-      console.log(`[REJECTION EMAIL SENT] Sent rejection email to ${nomineeEmail}`);
-    }
-  } catch (err) {
-    console.error('Error sending decision email:', err);
-  }
-};
-
-// Admin Verify Endpoint (Approve / Reject)
 exports.verifyNomination = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { verificationStatus, rejectionReason, verifiedDocuments } = req.body;
-
+    const { verificationStatus, rejectionReason = '', verifiedDocuments = [] } = req.body;
     if (!['Approved', 'Rejected'].includes(verificationStatus)) {
-      return res.status(400).json({
-        success: false,
-        message: 'verificationStatus must be Approved or Rejected'
-      });
+      return res.status(400).json({ success: false, message: 'Choose Approved or Rejected.' });
     }
-
-    let updatedItem = null;
-
+    if (verificationStatus === 'Rejected' && !String(rejectionReason).trim()) {
+      return res.status(400).json({ success: false, message: 'A rejection reason is required.' });
+    }
+    let nomination;
     if (mongoose.connection.readyState === 1) {
-      let nomination = null;
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        nomination = await Nomination.findById(id);
-      }
-      if (!nomination) {
-        nomination = await Nomination.findOne({ nominationId: id });
-      }
-
-      if (nomination) {
-        nomination.verificationStatus = verificationStatus;
-        nomination.status = verificationStatus;
-        nomination.rejectionReason = rejectionReason || '';
-        nomination.verifiedDocuments = verifiedDocuments || [];
-        nomination.score = calculateNomineeScore(nomination);
-        updatedItem = await nomination.save();
-        inMemoryNominations.set(String(updatedItem._id), updatedItem.toObject());
-        if (updatedItem.nominationId) {
-          inMemoryNominations.set(updatedItem.nominationId, updatedItem.toObject());
-        }
-      }
-    }
-
-    if (!updatedItem) {
-      // In-Memory map lookup
-      let item = inMemoryNominations.get(id);
-      if (!item) {
-        for (const [k, v] of inMemoryNominations.entries()) {
-          if (v._id === id || v.nominationId === id) {
-            item = v;
-            break;
-          }
-        }
-      }
-
-      if (item) {
-        item.verificationStatus = verificationStatus;
-        item.status = verificationStatus;
-        item.rejectionReason = rejectionReason || '';
-        item.verifiedDocuments = verifiedDocuments || [];
-        item.score = calculateNomineeScore(item);
-        item.updatedAt = new Date().toISOString();
-        inMemoryNominations.set(id, item);
-        if (item._id) inMemoryNominations.set(String(item._id), item);
-        if (item.nominationId) inMemoryNominations.set(item.nominationId, item);
-        updatedItem = item;
-      }
-    }
-
-    if (!updatedItem) {
-      return res.status(404).json({
-        success: false,
-        message: 'Nomination not found'
+      nomination = await Nomination.findOne({
+        $or: [{ _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }, { nominationId: req.params.id }],
       });
+    } else {
+      nomination = inMemoryNominations.get(req.params.id);
     }
-
-    // Trigger real-time email notification (non-blocking)
-    const recipientEmail = updatedItem.nominee?.email || updatedItem.email || updatedItem.nominator?.email;
-    const nomineeName = updatedItem.nominee?.name || updatedItem.nominee?.fullName || updatedItem.nomineeName || 'Alumni';
-
-    sendDecisionEmail(recipientEmail, nomineeName, verificationStatus, rejectionReason).catch(err => {
-      console.error('Non-blocking decision email warning:', err);
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Nomination marked as ${verificationStatus} and email notification triggered.`,
-      data: updatedItem
-    });
+    if (!nomination) return res.status(404).json({ success: false, message: 'Nomination not found.' });
+    if (verificationStatus === 'Approved' && nomination.createdBy === 'back-office' && nomination.nomineeApprovalStatus !== 'Approved') {
+      return res.status(409).json({ success: false, message: 'Wait for the nominee to approve the back-office nomination before verifying it.' });
+    }
+    if (verificationStatus === 'Approved') {
+      const requiredUrls = Object.values(nomination.documents || {}).flat().filter(Boolean);
+      if (!requiredUrls.length || !requiredUrls.every((url) => verifiedDocuments.includes(url))) {
+        return res.status(409).json({ success: false, message: 'Verify every uploaded document before approving the nomination.' });
+      }
+    }
+    Object.assign(nomination, { verificationStatus, rejectionReason, verifiedDocuments });
+    if (mongoose.connection.readyState === 1) await nomination.save();
+    return res.status(200).json({ success: true, message: 'Nomination verification updated.', data: nomination });
   } catch (error) {
-    console.error('Error verifying nomination:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update verification status: ' + (error.message || error)
-    });
+    return res.status(400).json({ success: false, message: error.message || 'Could not update verification.' });
   }
 };
 
-// Leaderboard Endpoint - Returns ranked approved candidates
+exports.setAwardResult = async (req, res) => {
+  try {
+    const { awardResult, revocationReason = '' } = req.body;
+    if (!['Undecided', 'Winner', 'NotAwarded', 'Revoked'].includes(awardResult)) {
+      return res.status(400).json({ success: false, message: 'Choose Winner, NotAwarded, Revoked, or Undecided.' });
+    }
+    if (awardResult === 'Revoked' && !String(revocationReason).trim()) {
+      return res.status(400).json({ success: false, message: 'A reason is required when revoking an award.' });
+    }
+    let nomination;
+    if (mongoose.connection.readyState === 1) {
+      const query = mongoose.isValidObjectId(req.params.id) ? { _id: req.params.id } : { nominationId: req.params.id };
+      nomination = await Nomination.findOne(query);
+      if (!nomination) return res.status(404).json({ success: false, message: 'Nomination not found.' });
+      if (['Winner', 'Revoked'].includes(nomination.awardResult) && awardResult !== nomination.awardResult && awardResult !== 'Revoked') {
+        return res.status(409).json({ success: false, message: 'A recorded winner must be revoked with a reason before the award status can change.' });
+      }
+      if (awardResult === 'Revoked' && nomination.awardResult !== 'Winner') {
+        return res.status(409).json({ success: false, message: 'Only an existing winner award can be revoked.' });
+      }
+      if (awardResult === 'Winner' && nomination.verificationStatus !== 'Approved') {
+        return res.status(409).json({ success: false, message: 'Only an approved nomination can be marked as an award winner.' });
+      }
+      if (awardResult === 'Winner' && nomination.reviewAssessment?.reviewers?.length !== 2) {
+        return res.status(409).json({ success: false, message: 'Save both eligibility reviewer assessments before selecting an award winner.' });
+      }
+      if (awardResult === 'Winner' && nomination.reviewAssessment.reviewers.some((reviewer) => reviewer.recommendation !== 'Recommend')) {
+        return res.status(409).json({ success: false, message: 'Both reviewers must recommend the nominee before selecting an award winner.' });
+      }
+      nomination.awardResult = awardResult;
+      nomination.awardRevocationReason = awardResult === 'Revoked' ? String(revocationReason).trim() : '';
+      nomination.awardYear = Number(req.body.awardYear) || nomination.awardYear || new Date().getFullYear();
+      await nomination.save();
+    } else {
+      nomination = inMemoryNominations.get(req.params.id);
+      if (!nomination) return res.status(404).json({ success: false, message: 'Nomination not found.' });
+      if (['Winner', 'Revoked'].includes(nomination.awardResult) && awardResult !== nomination.awardResult && awardResult !== 'Revoked') {
+        return res.status(409).json({ success: false, message: 'A recorded winner must be revoked with a reason before the award status can change.' });
+      }
+      if (awardResult === 'Revoked' && nomination.awardResult !== 'Winner') {
+        return res.status(409).json({ success: false, message: 'Only an existing winner award can be revoked.' });
+      }
+      if (awardResult === 'Winner' && nomination.verificationStatus !== 'Approved') {
+        return res.status(409).json({ success: false, message: 'Only an approved nomination can be marked as an award winner.' });
+      }
+      if (awardResult === 'Winner' && nomination.reviewAssessment?.reviewers?.length !== 2) {
+        return res.status(409).json({ success: false, message: 'Save both eligibility reviewer assessments before selecting an award winner.' });
+      }
+      if (awardResult === 'Winner' && nomination.reviewAssessment.reviewers.some((reviewer) => reviewer.recommendation !== 'Recommend')) {
+        return res.status(409).json({ success: false, message: 'Both reviewers must recommend the nominee before selecting an award winner.' });
+      }
+      Object.assign(nomination, {
+        awardResult,
+        awardRevocationReason: awardResult === 'Revoked' ? String(revocationReason).trim() : '',
+        awardYear: Number(req.body.awardYear) || nomination.awardYear || new Date().getFullYear()
+      });
+    }
+    return res.status(200).json({ success: true, message: 'Award result updated.', data: nomination });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Could not update award result.' });
+  }
+};
+
+exports.saveReviewAssessment = async (req, res) => {
+  try {
+    const reviewers = req.body.reviewers;
+    if (!Array.isArray(reviewers) || reviewers.length !== 2) {
+      return res.status(400).json({ success: false, message: 'Enter assessments from both reviewers.' });
+    }
+    const scoreKeys = ['general', 'categoryBased', 'awards', 'contribution', 'others'];
+    const normalizedReviewers = reviewers.map((reviewer) => {
+      const scores = {};
+      scoreKeys.forEach((key) => {
+        const value = Number(reviewer.scores?.[key]);
+        if (!Number.isInteger(value) || value < 0 || value > 5) throw new Error('Each review score must be between 0 and 5.');
+        scores[key] = value;
+      });
+      if (!String(reviewer.name || '').trim() || !['Recommend', 'Do not recommend'].includes(reviewer.recommendation)) {
+        throw new Error('Each reviewer must enter their name and recommendation.');
+      }
+      return { name: String(reviewer.name).trim(), scores, recommendation: reviewer.recommendation };
+    });
+    if (normalizedReviewers[0].name.toLowerCase() === normalizedReviewers[1].name.toLowerCase()) {
+      return res.status(400).json({ success: false, message: 'The two assessments must be from different reviewers.' });
+    }
+    const totals = normalizedReviewers.map(({ scores }) => Object.values(scores).reduce((sum, value) => sum + value, 0));
+    const reviewAssessment = { reviewers: normalizedReviewers, reviewerTotals: totals, totalPoints: Math.round(totals.reduce((sum, value) => sum + value, 0) / 2), updatedAt: new Date().toISOString() };
+    let nomination;
+    if (mongoose.connection.readyState === 1) {
+      nomination = await Nomination.findOneAndUpdate(
+        { $or: [{ _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }, { nominationId: req.params.id }] },
+        { reviewAssessment }, { new: true, runValidators: true }
+      );
+    } else {
+      nomination = inMemoryNominations.get(req.params.id);
+      if (nomination) Object.assign(nomination, { reviewAssessment, updatedAt: new Date().toISOString() });
+    }
+    if (!nomination) return res.status(404).json({ success: false, message: 'Nomination not found.' });
+    return res.status(200).json({ success: true, message: 'Two-reviewer eligibility assessment saved.', data: nomination });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Could not save review assessment.' });
+  }
+};
+
+exports.getNominationWindow = async (req, res) => {
+  try {
+    return res.status(200).json(await readNominationWindow());
+  } catch {
+    return res.status(200).json({ isOpen: false, startAt: null, endAt: null });
+  }
+};
+
+exports.setNominationWindow = async (req, res) => {
+  try {
+    const startAt = new Date(req.body.startAt);
+    const endAt = new Date(req.body.endAt);
+    if (!req.body.startAt || !req.body.endAt || !Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || startAt >= endAt) {
+      return res.status(400).json({ success: false, message: 'Provide a valid opening and closing date/time, with closing after opening.' });
+    }
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ success: false, message: 'Nomination schedule needs a database connection to persist.' });
+    }
+    const window = { startAt: startAt.toISOString(), endAt: endAt.toISOString() };
+    await Setting.findOneAndUpdate(
+      { key: 'nominationWindow' },
+      { key: 'nominationWindow', value: window },
+      { upsert: true, new: true, runValidators: true }
+    );
+    const state = await readNominationWindow();
+    return res.status(200).json({ success: true, ...state, message: 'Nomination opening and closing times saved.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Could not save nomination schedule.' });
+  }
+};
+
 exports.getLeaderboard = async (req, res) => {
   try {
-    let approvedItems = [];
-
-    if (mongoose.connection.readyState === 1) {
-      approvedItems = await Nomination.find({
-        $or: [
-          { verificationStatus: 'Approved' },
-          { status: 'Approved' }
-        ]
-      }).lean();
-    }
-
-    // Merge in-memory approved items as well
-    const memMap = new Map();
-    approvedItems.forEach(item => {
-      if (item) {
-        const key = item.nominationId || String(item._id);
-        memMap.set(key, item);
-      }
-    });
-
-    for (const item of inMemoryNominations.values()) {
-      if (!item) continue;
-      if (item.verificationStatus === 'Approved' || item.status === 'Approved') {
-        const key = item.nominationId || String(item._id);
-        if (!memMap.has(key)) {
-          memMap.set(key, item);
-        }
-      }
-    }
-
-    const allApproved = Array.from(memMap.values());
-
-    // Calculate score & sort by score descending
-    const scoredList = allApproved.map((item) => {
-      const computedScore = item.score && item.score > 0 ? item.score : calculateNomineeScore(item);
-      return {
-        ...item,
-        score: computedScore
-      };
-    });
-
-    scoredList.sort((a, b) => b.score - a.score);
-
-    // Assign rank 1, 2, 3...
-    const leaderboard = scoredList.map((item, index) => ({
-      rank: index + 1,
-      ...item
-    }));
-
-    return res.status(200).json({
-      success: true,
-      count: leaderboard.length,
-      data: leaderboard
-    });
-  } catch (error) {
-    console.error('Error fetching leaderboard:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve leaderboard'
-    });
+    const data = mongoose.connection.readyState === 1
+      ? await Nomination.find({ awardResult: 'Winner' }).sort({ awardYear: -1, createdAt: -1 }).lean()
+      : Array.from(new Set(inMemoryNominations.values())).filter((item) => item.awardResult === 'Winner');
+    return res.status(200).json({ success: true, data });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Could not load award winners.' });
   }
 };
 
-// Get Nomination Form Opening/Closing Status (Public)
-exports.getNominationStatus = async (req, res) => {
+exports.respondToNomineeApproval = async (req, res) => {
   try {
-    let isOpen = inMemoryFormOpen;
+    const { decision } = req.body;
+    if (!['approve', 'decline'].includes(decision)) return res.status(400).json({ success: false, message: 'Choose approve or decline.' });
+    const tokenHash = crypto.createHash('sha256').update(String(req.params.token)).digest('hex');
+    let nomination;
     if (mongoose.connection.readyState === 1) {
-      const setting = await Setting.findOne({ key: 'nomination_form_open' });
-      if (setting !== null && setting !== undefined) {
-        isOpen = Boolean(setting.value);
-      }
+      nomination = await Nomination.findOne({ approvalTokenHash: tokenHash, nomineeApprovalStatus: 'Pending' });
+      if (nomination && new Date(nomination.approvalTokenExpiresAt).getTime() >= Date.now()) {
+        nomination.nomineeApprovalStatus = decision === 'approve' ? 'Approved' : 'Declined';
+        nomination.approvalTokenHash = '';
+        nomination.approvalTokenExpiresAt = null;
+        await nomination.save();
+      } else nomination = null;
+    } else {
+      nomination = Array.from(new Set(inMemoryNominations.values())).find((item) => item.approvalTokenHash === tokenHash && item.nomineeApprovalStatus === 'Pending');
+      if (nomination && new Date(nomination.approvalTokenExpiresAt).getTime() >= Date.now()) {
+        Object.assign(nomination, {
+          nomineeApprovalStatus: decision === 'approve' ? 'Approved' : 'Declined',
+          approvalTokenHash: '',
+          approvalTokenExpiresAt: null,
+        });
+      } else nomination = null;
     }
-    return res.status(200).json({
-      success: true,
-      isOpen
-    });
+    if (!nomination) return res.status(410).json({ success: false, message: 'This approval link is invalid, already used, or expired. Contact the Alumni Association office.' });
+    return res.status(200).json({ success: true, message: decision === 'approve' ? 'You approved this nomination.' : 'You declined this nomination.' });
   } catch (error) {
-    console.error('Error fetching nomination status:', error);
-    return res.status(500).json({
-      success: false,
-      isOpen: inMemoryFormOpen,
-      message: 'Failed to fetch nomination status'
-    });
+    return res.status(500).json({ success: false, message: error.message || 'Could not save your response.' });
   }
 };
 
-// Toggle Nomination Form Opening/Closing Status (Admin Only)
-exports.toggleNominationStatus = async (req, res) => {
+exports.getNomineeApproval = async (req, res) => {
   try {
-    const { isOpen } = req.body;
-    const targetStatus = Boolean(isOpen);
-    inMemoryFormOpen = targetStatus;
-
-    if (mongoose.connection.readyState === 1) {
-      await Setting.findOneAndUpdate(
-        { key: 'nomination_form_open' },
-        { value: targetStatus },
-        { upsert: true, new: true }
-      );
+    const tokenHash = crypto.createHash('sha256').update(String(req.params.token)).digest('hex');
+    let nomination = mongoose.connection.readyState === 1
+      ? await Nomination.findOne({ approvalTokenHash: tokenHash, nomineeApprovalStatus: 'Pending' }).lean()
+      : Array.from(new Set(inMemoryNominations.values())).find((item) => item.approvalTokenHash === tokenHash && item.nomineeApprovalStatus === 'Pending');
+    if (!nomination || new Date(nomination.approvalTokenExpiresAt).getTime() < Date.now()) {
+      return res.status(410).json({ success: false, message: 'This approval link is invalid, already used, or expired.' });
     }
-
-    let emailResult = null;
-    // If Admin opens the nomination form, send email notification to praga007thija@gmail.com
-    if (targetStatus) {
-      const origin = req.headers.origin || req.headers.referer || 'http://localhost:5173';
-      const cleanOrigin = origin.replace(/\/$/, '');
-      const formUrl = `${cleanOrigin}/nomination`;
-      
-      const recipientEmail = 'praga007thija@gmail.com';
-      console.log(`[Admin Action] Opening Nomination Form and sending announcement email to ${recipientEmail} with form URL: ${formUrl}`);
-      emailResult = await sendNominationFormOpenEmail(recipientEmail, formUrl);
-    }
-
-    return res.status(200).json({
-      success: true,
-      isOpen: targetStatus,
-      emailResult,
-      message: targetStatus
-        ? `Nomination form opened successfully.${emailResult?.sent ? ' Email notification sent to praga007thija@gmail.com.' : ' Email notification triggered.'}`
-        : 'Nomination form closed successfully. The form link is now deactivated for new submissions.'
-    });
-  } catch (error) {
-    console.error('Error toggling nomination status:', error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to update nomination status'
-    });
+    const { nominee, professional, category, categoryDetails, necContribution, nominationId } = nomination;
+    return res.status(200).json({ success: true, data: { nominationId, nominee, professional, category, categoryDetails, necContribution } });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Could not load nomination details.' });
   }
 };
 
-
-
+exports.resendNomineeApproval = async (req, res) => {
+  try {
+    const query = mongoose.isValidObjectId(req.params.id) ? { _id: req.params.id } : { nominationId: req.params.id };
+    let nomination = mongoose.connection.readyState === 1
+      ? await Nomination.findOne(query)
+      : inMemoryNominations.get(req.params.id);
+    if (!nomination || nomination.createdBy !== 'back-office' || nomination.nomineeApprovalStatus !== 'Pending') {
+      return res.status(404).json({ success: false, message: 'No pending back-office approval was found.' });
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    nomination.approvalTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    nomination.approvalTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (typeof nomination.save === 'function') await nomination.save();
+    const appUrl = process.env.APP_BASE_URL || process.env.NOMINATION_FORM_URL || 'http://localhost:3000';
+    const result = await sendNomineeApprovalEmail(
+      nomination.nominee.email,
+      nomination.nominee.name || 'Alumnus',
+      nomination.nominationId,
+      `${appUrl.replace(/\/$/, '')}/nomination/approval/${token}`
+    );
+    if (!result.sent) return res.status(503).json({ success: false, message: 'Approval email could not be sent. Check SMTP configuration.' });
+    return res.status(200).json({ success: true, message: 'Nominee approval email sent.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Could not resend approval email.' });
+  }
+};

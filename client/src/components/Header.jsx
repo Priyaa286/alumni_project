@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, LayoutDashboard, FileText, Trophy } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
-import { isAdminEmail } from '../config/adminList';
 
 const Header = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -12,7 +11,7 @@ const Header = () => {
 
   // Check authentication & admin status
   const isLoggedIn = Boolean(isAuthenticated && user);
-  const isAdmin = isLoggedIn && (user?.role === 'admin' || isAdminEmail(user?.email));
+  const isAdmin = isLoggedIn && user?.role === 'admin';
 
   const handleLogout = () => {
     logout();

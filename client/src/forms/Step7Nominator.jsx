@@ -24,6 +24,17 @@ const Step7Nominator = ({ register, formState: { errors } }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-2 md:col-span-2">
+          <label className="text-sm font-bold text-slate-700">Nomination Source <span className="text-red-500">*</span></label>
+          <select {...register('nominator.source', { required: 'Select how the nominee was identified.' })} className="w-full rounded-nec border border-borderlight bg-white px-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-primary/20">
+            <option value="">Select source</option>
+            <option value="Batch">Batch</option>
+            <option value="Chapter">Chapter</option>
+            <option value="Fellow Alumni">Fellow Alumni</option>
+          </select>
+          {errors?.nominator?.source && <span className="text-xs font-medium text-red-500">{errors.nominator.source.message}</span>}
+        </div>
+
         {/* Nominated By */}
         <div className="flex flex-col gap-2">
           <label className="text-sm font-bold text-slate-700">

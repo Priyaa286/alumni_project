@@ -41,31 +41,42 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
   };
 
   const renderBusinessFields = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-bold text-slate-700">Annual Turnover (INR) <span className="text-red-500">*</span></label>
-        <input
-          type="text"
-          placeholder="e.g. 5 Crores"
-          {...register('categoryDetails.annualTurnover', { required: 'Annual Turnover is required for Business category' })}
-          className="w-full px-4 py-2.5 rounded-nec border border-borderlight focus:ring-4 focus:ring-primary/20 focus:outline-none transition-all"
-        />
-        {errors?.categoryDetails?.annualTurnover && (
-          <span className="text-xs text-red-500 font-medium">{errors.categoryDetails.annualTurnover.message}</span>
-        )}
+        <label className="text-sm font-bold text-slate-700">Business Type <span className="text-red-500">*</span></label>
+        <select {...register('categoryDetails.businessType', { required: 'Choose company leadership or own business.' })} className="w-full rounded-nec border border-borderlight bg-white px-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-primary/20">
+          <option value="">Select business type</option>
+          <option value="Company Leadership">Company Leadership</option>
+          <option value="Own Business">Own Business</option>
+        </select>
+        {errors?.categoryDetails?.businessType && <span className="text-xs text-red-500">{errors.categoryDetails.businessType.message}</span>}
       </div>
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-bold text-slate-700">Employee Strength <span className="text-red-500">*</span></label>
+        <label className="text-sm font-bold text-slate-700">Position / Capacity <span className="text-red-500">*</span></label>
+        <input {...register('categoryDetails.position', { required: 'Position or business capacity is required.' })} placeholder="Manager, Director, AVP, Owner" className="w-full rounded-nec border border-borderlight px-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-primary/20" />
+        {errors?.categoryDetails?.position && <span className="text-xs text-red-500">{errors.categoryDetails.position.message}</span>}
+      </div>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-bold text-slate-700">Annual Turnover and Currency</label>
+        <input
+          type="text"
+          placeholder="e.g. INR 50 Crores"
+          {...register('categoryDetails.annualTurnover')}
+          className="w-full px-4 py-2.5 rounded-nec border border-borderlight focus:ring-4 focus:ring-primary/20 focus:outline-none transition-all"
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+          <label className="text-sm font-bold text-slate-700">Employee Strength</label>
         <input
           type="number"
           min="1"
           placeholder="e.g. 50"
-          {...register('categoryDetails.employeeStrength', { required: 'Employee Strength is required for Business category' })}
+          {...register('categoryDetails.employeeStrength')}
           className="w-full px-4 py-2.5 rounded-nec border border-borderlight focus:ring-4 focus:ring-primary/20 focus:outline-none transition-all"
         />
-        {errors?.categoryDetails?.employeeStrength && (
-          <span className="text-xs text-red-500 font-medium">{errors.categoryDetails.employeeStrength.message}</span>
-        )}
       </div>
       <div className="flex flex-col gap-2">
         <label className="text-sm font-bold text-slate-700">Operating Country <span className="text-red-500">*</span></label>
@@ -79,6 +90,11 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
           <span className="text-xs text-red-500 font-medium">{errors.categoryDetails.country.message}</span>
         )}
       </div>
+    </div>
+    <details className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+      <summary className="cursor-pointer font-bold text-slate-800">Country criteria used by the committee (turnover and staff limits are optional)</summary>
+      <p className="mt-2 leading-relaxed">Australia, Germany, Japan, Singapore: Manager or above, including own-business candidates. Canada: Director or above, USD 500 million and 100 staff; own business USD 2 million and 10 staff. India: AVP/AGM or above, INR 50 crore and 200 staff; own business INR 15 crore and 100 staff. Kuwait, Qatar, UAE: Manager or senior engineer in manufacturing, oil, or gas, USD 3 million and 50 staff; own business USD 2 million. UK: Manager or above, GBP 25 million and 50 staff; own business GBP 2 million and 10 staff. USA: Director or above, USD 500 million and 100 staff; own business USD 2 million and 10 staff. The committee may approve exceptions.</p>
+    </details>
     </div>
   );
 
@@ -96,6 +112,13 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
           {errors?.categoryDetails?.institution && (
             <span className="text-xs text-red-500 font-medium">{errors.categoryDetails.institution.message}</span>
           )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-bold text-slate-700">Institution Sector <span className="text-red-500">*</span></label>
+          <select {...register('categoryDetails.institutionSector', { required: 'Select public or private sector.' })} className="w-full rounded-nec border border-borderlight bg-white px-4 py-2.5 focus:outline-none focus:ring-4 focus:ring-primary/20">
+            <option value="">Select sector</option><option value="Public">Public</option><option value="Private">Private</option>
+          </select>
+          {errors?.categoryDetails?.institutionSector && <span className="text-xs text-red-500">{errors.categoryDetails.institutionSector.message}</span>}
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm font-bold text-slate-700">Academic Designation <span className="text-red-500">*</span></label>
@@ -156,6 +179,7 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
           className="w-full px-4 py-2.5 rounded-nec border border-borderlight focus:ring-4 focus:ring-primary/20 focus:outline-none transition-all resize-none"
         />
       </div>
+      <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">Committee guidance: public-sector Director or above; private-sector Manager or above. Professor and above is considered for institutes ranked in the top 50 by NIRF, or Associate Professor and above for institutes ranked in the top 20.</p>
     </div>
   );
 
@@ -749,6 +773,19 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
           Providing specialized profiles for <span className="font-bold text-primary">{category}</span>.
         </p>
       </div>
+
+      {category && (
+        <div className="flex flex-col gap-2 rounded-xl border border-purple-200 bg-purple-50 p-4">
+          <label className="text-sm font-bold text-slate-800">How has this achievement benefited NEC, the Alumni Association, the nation, community, or organization? <span className="text-red-500">*</span></label>
+          <textarea
+            rows="3"
+            placeholder="Describe the public, community, organizational, or NEC impact of the nominee's achievement."
+            {...register('categoryDetails.benefitImpact', { required: 'Describe the benefit or impact of the nominee’s achievement.' })}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-primary/20"
+          />
+          {errors?.categoryDetails?.benefitImpact && <span className="text-xs font-medium text-red-600">{errors.categoryDetails.benefitImpact.message}</span>}
+        </div>
+      )}
 
       {category === 'Business' && renderBusinessFields()}
       {category === 'Academic' && renderAcademicFields()}

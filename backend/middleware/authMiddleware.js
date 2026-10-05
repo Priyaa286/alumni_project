@@ -1,19 +1,26 @@
-// Middleware to verify authorization header / role for admin endpoints
+const { verifySignedToken } = require('../utils/signedToken');
 
-exports.verifyAdmin = (req, res, next) => {
+exports.authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const userRoleHeader = req.headers['x-user-role'];
-
-  // Check Bearer token or x-user-role header for demo role validation
-  if (
-    (authHeader && authHeader.includes('admin')) ||
-    userRoleHeader === 'admin'
-  ) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const user = verifySignedToken(token);
+  if (user && ['admin', 'user'].includes(user.role) && user.email) {
+    req.user = user;
     return next();
   }
 
-  return res.status(403).json({
+  return res.status(401).json({
     success: false,
-    message: 'Access denied: Admin authorization required'
+    message: 'Please sign in again to continue.'
+  });
+};
+
+exports.verifyAdmin = (req, res, next) => {
+  exports.authenticate(req, res, (error) => {
+    if (error) return next(error);
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Administrator access is required.' });
+    }
+    next();
   });
 };
