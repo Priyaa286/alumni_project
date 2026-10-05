@@ -142,7 +142,7 @@ NEC Alumni Portal`;
  * @param {string} to - Recipient email address (e.g. praga007thija@gmail.com)
  * @param {string} formUrl - Full link to the nomination form
  */
-const sendNominationFormOpenEmail = async (to = 'praga007thija@gmail.com', formUrl = 'http://localhost:5173/nomination') => {
+const sendNominationFormOpenEmail = async (to = 'priyamalarkannan666@gmail.com', formUrl = 'http://localhost:3000/nomination') => {
   const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Alumni Portal <alumni@nec.edu>';
 
   if (!isSMTPConfigured()) {
