@@ -66,6 +66,20 @@ exports.sendOTP = async (req, res) => {
 
     if (!emailResult.sent) {
       const smtpMissing = emailResult.reason?.includes('not configured');
+      if (smtpMissing && (process.env.NODE_ENV !== 'production' || process.env.LOCAL_DEV_AUTH === 'true')) {
+        console.log(`\n==================================================`);
+        console.log(`[DEV MODE OTP GENERATED FOR ${cleanEmail}]: ${rawOtp}`);
+        console.log(`==================================================\n`);
+
+        return res.status(200).json({
+          success: true,
+          message: `[DEV MODE] Verification code generated: ${rawOtp}`,
+          emailConfigured: false,
+          devOtp: rawOtp,
+          otpExpiresInSeconds: 300,
+        });
+      }
+
       return res.status(503).json({
         success: false,
         message: smtpMissing

@@ -12,6 +12,7 @@ const Header = () => {
   // Check authentication & admin status
   const isLoggedIn = Boolean(isAuthenticated && user);
   const isAdmin = isLoggedIn && user?.role === 'admin';
+  const isFormPage = ['/nomination', '/admin/create-nomination'].includes(location.pathname);
 
   const handleLogout = () => {
     logout();
@@ -44,7 +45,7 @@ const Header = () => {
 
         {/* Center: Admin Navigations OR Portal Span Banner */}
         <div className="text-center">
-          {isAdmin ? (
+          {isAdmin && !isFormPage ? (
             <div className="flex items-center gap-3">
               {/* Leaderboard Navigation */}
               <Link
@@ -83,7 +84,7 @@ const Header = () => {
           )}
         </div>
 
-        {/* Right: Alumni Association Logo & Logout Button */}
+        {/* Right: Alumni Association Logo */}
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center p-1 bg-white/80 rounded-xl shadow-sm border border-primary/10">
             <img
@@ -93,8 +94,8 @@ const Header = () => {
             />
           </div>
 
-          {/* Logout button displayed for any logged in user session */}
-          {isLoggedIn && (
+          {/* Logout button displayed only outside form pages when logged in */}
+          {isLoggedIn && !isFormPage && (
             <button
               onClick={handleLogout}
               title="Logout"

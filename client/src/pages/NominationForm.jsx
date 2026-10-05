@@ -415,7 +415,6 @@ const NominationForm = ({ backOffice = false }) => {
 
     <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       {/* ProgressBar */}
-      {backOffice && <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">Back-office nomination: the nominee will be asked to approve the completed details by email.</div>}
       <ProgressBar currentStep={currentStep} totalSteps={activeSteps.length} />
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">

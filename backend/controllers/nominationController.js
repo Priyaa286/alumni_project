@@ -4,7 +4,7 @@ const Setting = require('../models/Setting');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { verifySignedToken } = require('../utils/signedToken');
-const { sendNomineeApprovalEmail } = require('../utils/sendEmail');
+const { sendNomineeApprovalEmail, sendNominationFormOpenEmail } = require('../utils/sendEmail');
 const memberController = require('./memberController');
 const { isServingCommitteeMember } = require('../config/committeeList');
 
@@ -527,7 +527,14 @@ exports.setNominationWindow = async (req, res) => {
       { upsert: true, new: true, runValidators: true }
     );
     const state = await readNominationWindow();
-    return res.status(200).json({ success: true, ...state, message: 'Nomination opening and closing times saved.' });
+    
+    // Automatically notify priyamalarkannan@gmail.com when nomination form window is saved / opened
+    const appUrl = process.env.APP_BASE_URL || process.env.NOMINATION_FORM_URL || 'http://localhost:3000/nomination';
+    sendNominationFormOpenEmail('priyamalarkannan666@gmail.com', appUrl).catch((emailErr) => {
+      console.error('Notice: Could not send nomination open email to priyamalarkannan666@gmail.com:', emailErr.message);
+    });
+
+    return res.status(200).json({ success: true, ...state, message: 'Nomination opening schedule saved and notification sent to priyamalarkannan666@gmail.com.' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || 'Could not save nomination schedule.' });
   }
