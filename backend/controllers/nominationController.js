@@ -528,13 +528,26 @@ exports.setNominationWindow = async (req, res) => {
     );
     const state = await readNominationWindow();
     
-    // Automatically notify priyamalarkannan@gmail.com when nomination form window is saved / opened
-    const appUrl = process.env.APP_BASE_URL || process.env.NOMINATION_FORM_URL || 'http://localhost:3000/nomination';
-    sendNominationFormOpenEmail('priyamalarkannan666@gmail.com', appUrl).catch((emailErr) => {
-      console.error('Notice: Could not send nomination open email to priyamalarkannan666@gmail.com:', emailErr.message);
-    });
+    // Send email to priyamalarkannan666@gmail.com whenever the nomination window schedule is saved with a future closing date
+    let emailNotice = '';
+    const now = Date.now();
+    const isFutureClosing = endAt.getTime() > now;
+    
+    if (state.isOpen || isFutureClosing) {
+      const appUrl = process.env.APP_BASE_URL || process.env.NOMINATION_FORM_URL || 'http://localhost:3000/nomination';
+      const emailResult = await sendNominationFormOpenEmail('priyamalarkannan666@gmail.com', appUrl);
+      if (emailResult.sent) {
+        console.log(`[NOMINATION WINDOW] Email successfully sent to priyamalarkannan666@gmail.com (Message ID: ${emailResult.messageId})`);
+        emailNotice = ' and notification email sent to priyamalarkannan666@gmail.com.';
+      } else {
+        console.error(`[NOMINATION WINDOW] Failed to send email to priyamalarkannan666@gmail.com: ${emailResult.reason || emailResult.error}`);
+        emailNotice = ` (Schedule saved, but email could not be sent: ${emailResult.reason || emailResult.error}).`;
+      }
+    } else {
+      emailNotice = ' (Form closing date is in the past, so no email was sent).';
+    }
 
-    return res.status(200).json({ success: true, ...state, message: 'Nomination opening schedule saved and notification sent to priyamalarkannan666@gmail.com.' });
+    return res.status(200).json({ success: true, ...state, message: `Nomination schedule saved${emailNotice}` });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || 'Could not save nomination schedule.' });
   }

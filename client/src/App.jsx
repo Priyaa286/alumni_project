@@ -34,16 +34,17 @@ function AppContent() {
       {/* Main Content Area with Client Routing */}
       <main className="flex-grow w-full py-4">
         <Routes>
-          {/* Default landing page route (Login) */}
-          <Route path="/" element={<Login />} />
-          <Route path="/nomination" element={<ProtectedRoute requiredRole="user"><NominationForm /></ProtectedRoute>} />
+          {/* Public Nomination Form Route */}
+          <Route path="/" element={<NominationForm />} />
+          <Route path="/nomination" element={<NominationForm />} />
           <Route path="/nomination/approval/:token" element={<NomineeApproval />} />
 
           {/* Public Leaderboard Route */}
           <Route path="/leaderboard" element={<Leaderboard />} />
 
-          {/* Admin Login Route */}
+          {/* Admin Login Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<Login />} />
 
           {/* Admin Dashboard Route (Protected - Admin Only) */}
           <Route
@@ -75,7 +76,7 @@ function AppContent() {
           />
 
           {/* Default Redirect to Nomination Form */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/nomination" replace />} />
         </Routes>
       </main>
 
