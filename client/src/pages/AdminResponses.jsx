@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, Component } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Component } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Users, Award, Calendar, Mail, Phone, Eye, Search, Filter, 
+  Users, Award, Calendar, Mail, Phone, Eye, Search, Filter, Zap,
   Clock, FileText, RefreshCw, X, GraduationCap, Trophy, Medal, UserCheck, Layers, AlertTriangle, CheckCircle2, XCircle, ShieldCheck, Lock, Unlock, Plus
 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -125,6 +125,8 @@ const toDateTimeLocal = (value) => {
 
 const AdminResponsesContent = () => {
   const navigate = useNavigate();
+  const startInputRef = useRef(null);
+  const endInputRef = useRef(null);
   const [nominations, setNominations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -306,14 +308,96 @@ const AdminResponsesContent = () => {
           </div>
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto">
-          <label className="text-[10px] font-bold uppercase text-purple-100">Opens at
-            <input type="datetime-local" value={windowStart} onChange={(event) => setWindowStart(event.target.value)} className="mt-1 block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-800" />
-          </label>
-          <label className="text-[10px] font-bold uppercase text-purple-100">Closes at
-            <input type="datetime-local" value={windowEnd} onChange={(event) => setWindowEnd(event.target.value)} className="mt-1 block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-800" />
-          </label>
-          <button onClick={handleSaveWindow} disabled={togglingStatus} className="rounded-lg bg-purple-500 px-4 py-2 text-xs font-bold text-white hover:bg-purple-400 disabled:opacity-50 sm:col-span-2">
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:w-auto">
+          {/* Opens At Field */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase text-purple-100">Opens at</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setWindowStart(toDateTimeLocal(new Date()))}
+                  className="px-2 py-0.5 rounded bg-purple-800/90 hover:bg-purple-700 text-purple-100 text-[10px] font-bold border border-purple-400/40 transition-all flex items-center gap-1 cursor-pointer"
+                  title="Set opening time to right now"
+                >
+                  <Zap className="w-2.5 h-2.5 text-amber-300" />
+                  <span>Now</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (startInputRef.current) {
+                      startInputRef.current.showPicker ? startInputRef.current.showPicker() : startInputRef.current.focus();
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded bg-purple-800/90 hover:bg-purple-700 text-purple-100 text-[10px] font-bold border border-purple-400/40 transition-all flex items-center gap-1 cursor-pointer"
+                  title="Open calendar & time picker"
+                >
+                  <Calendar className="w-2.5 h-2.5 text-purple-300" />
+                  <span>Select Calendar</span>
+                </button>
+              </div>
+            </div>
+            <input
+              ref={startInputRef}
+              type="datetime-local"
+              value={windowStart}
+              onChange={(event) => setWindowStart(event.target.value)}
+              className="mt-0.5 block w-full rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-purple-400 focus:outline-none"
+            />
+          </div>
+
+          {/* Closes At Field */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase text-purple-100">Closes at</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setWindowEnd(toDateTimeLocal(new Date()))}
+                  className="px-2 py-0.5 rounded bg-purple-800/90 hover:bg-purple-700 text-purple-100 text-[10px] font-bold border border-purple-400/40 transition-all flex items-center gap-1 cursor-pointer"
+                  title="Set closing time to right now"
+                >
+                  <Zap className="w-2.5 h-2.5 text-amber-300" />
+                  <span>Now</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 7);
+                    setWindowEnd(toDateTimeLocal(d));
+                  }}
+                  className="px-2 py-0.5 rounded bg-purple-800/90 hover:bg-purple-700 text-purple-100 text-[10px] font-bold border border-purple-400/40 transition-all flex items-center gap-1 cursor-pointer"
+                  title="Set closing time to 7 days from now"
+                >
+                  <span>+7d</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (endInputRef.current) {
+                      endInputRef.current.showPicker ? endInputRef.current.showPicker() : endInputRef.current.focus();
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded bg-purple-800/90 hover:bg-purple-700 text-purple-100 text-[10px] font-bold border border-purple-400/40 transition-all flex items-center gap-1 cursor-pointer"
+                  title="Open calendar & time picker"
+                >
+                  <Calendar className="w-2.5 h-2.5 text-purple-300" />
+                  <span>Select Calendar</span>
+                </button>
+              </div>
+            </div>
+            <input
+              ref={endInputRef}
+              type="datetime-local"
+              value={windowEnd}
+              onChange={(event) => setWindowEnd(event.target.value)}
+              className="mt-0.5 block w-full rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-purple-400 focus:outline-none"
+            />
+          </div>
+
+          <button onClick={handleSaveWindow} disabled={togglingStatus} className="rounded-lg bg-purple-500 px-4 py-2 text-xs font-bold text-white hover:bg-purple-400 disabled:opacity-50 sm:col-span-2 shadow-md cursor-pointer transition-all">
             {togglingStatus ? 'Saving schedule…' : 'Save nomination window'}
           </button>
         </div>

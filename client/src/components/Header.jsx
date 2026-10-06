@@ -45,7 +45,7 @@ const Header = () => {
 
         {/* Center: Admin Navigations OR Portal Span Banner */}
         <div className="text-center">
-          {isAdmin && !isFormPage ? (
+          {isAdmin ? (
             <div className="flex items-center gap-3">
               {/* Leaderboard Navigation */}
               <Link
@@ -94,8 +94,8 @@ const Header = () => {
             />
           </div>
 
-          {/* Logout button displayed only outside form pages when logged in */}
-          {isLoggedIn && !isFormPage && (
+          {/* Logout button displayed for logged in admin */}
+          {isAdmin && (
             <button
               onClick={handleLogout}
               title="Logout"
