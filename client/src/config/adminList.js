@@ -5,6 +5,9 @@
  * Note: The backend file (backend/config/adminList.js) is authoritative for security.
  */
 export const ADMIN_EMAILS = [
+  '24205023@nec.edu.in',
+  '24205035@nec.edu.in',
+  '24205055@nec.edu.in',
   'admin@nec.edu',
   'principal@nec.edu',
   'alumni@nec.edu',

@@ -74,7 +74,11 @@ const Login = () => {
     try {
       const res = await requestOtp(email.trim());
       if (res.success) {
-        toast.success(`Verification code sent to ${email.trim()}`);
+        if (res.devOtp) {
+          toast.info(`[DEV MODE] Verification code: ${res.devOtp}`, { autoClose: 10000 });
+        } else {
+          toast.success(`Verification code sent to ${email.trim()}`);
+        }
         setStep('otp');
         setResendTimer(60); // 60 seconds resend timer
       } else {
@@ -244,7 +248,7 @@ const Login = () => {
                 className="space-y-5"
               >
                 {/* Email Form */}
-                <form onSubmit={isLocalDevelopment ? handleLocalSignIn : handleSendOtp} className="space-y-4">
+                <form onSubmit={handleSendOtp} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Email Address
@@ -276,11 +280,11 @@ const Login = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>{isLocalDevelopment ? 'Signing in locally...' : 'Sending Verification Code...'}</span>
+                        <span>Sending Verification Code...</span>
                       </>
                     ) : (
                       <>
-                        <span>{isLocalDevelopment ? 'Sign In for Local Development' : 'Send 6-Digit OTP Code'}</span>
+                        <span>Send 6-Digit OTP Code</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
