@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Set up base Axios configuration
 const API = axios.create({
-  baseURL: '', // Empty base URL is routed through Vite dev server proxy
+  baseURL: import.meta.env.VITE_API_BASE_URL || '', // Configured via VITE_API_BASE_URL in production, or fallback to dev proxy
   headers: {
     'Content-Type': 'application/json',
   },
@@ -78,7 +78,7 @@ export const uploadFile = async (file, onUploadProgress) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await axios.post('/api/upload', formData, {
+  const response = await API.post('/api/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
