@@ -22,7 +22,7 @@ const Step9Review = ({ watch, onEditStep }) => {
   };
 
   const renderFileIcon = (url) => {
-    const isImage = /\.(jpeg|jpg|png)$/i.test(url);
+    const isImage = /\.(jpeg|jpg|png|webp|gif|bmp|heic|heif|svg)$/i.test(url);
     if (isImage) return <ImageIcon className="w-4 h-4 text-primary" />;
     return <FileText className="w-4 h-4 text-red-500" />;
   };

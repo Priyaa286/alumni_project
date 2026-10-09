@@ -10,7 +10,7 @@ router.put('/nominations/:id', verifyAdmin, nominationController.updateNominatio
 router.delete('/nominations/:id', verifyAdmin, nominationController.deleteNomination);
 
 router.get('/nomination-status', nominationController.getNominationWindow);
-router.get('/leaderboard', nominationController.getLeaderboard);
+router.get('/leaderboard', verifyAdmin, nominationController.getLeaderboard);
 router.post('/nominee-approval/:token', nominationController.respondToNomineeApproval);
 router.get('/nominee-approval/:token', nominationController.getNomineeApproval);
 

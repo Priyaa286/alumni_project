@@ -77,7 +77,7 @@ const Step6Documents = ({ watch, setValue }) => {
 
   // Render file icon helper
   const renderFileIcon = (url) => {
-    const isImage = /\.(jpeg|jpg|png)$/i.test(url);
+    const isImage = /\.(jpeg|jpg|png|webp|gif|bmp|heic|heif|svg)$/i.test(url);
     if (isImage) return <ImageIcon className="w-5 h-5 text-blue-500" />;
     return <FileText className="w-5 h-5 text-red-500" />;
   };
@@ -88,12 +88,28 @@ const Step6Documents = ({ watch, setValue }) => {
       onDrop: (acceptedFiles) => handleUpload(acceptedFiles, docType),
       accept: docType.imagesOnly ? {
         'image/png': ['.png'],
-        'image/jpeg': ['.jpeg', '.jpg']
+        'image/jpeg': ['.jpeg', '.jpg'],
+        'image/webp': ['.webp'],
+        'image/gif': ['.gif'],
+        'image/bmp': ['.bmp'],
+        'image/heic': ['.heic'],
+        'image/heif': ['.heif'],
       } : {
         'application/pdf': ['.pdf'],
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+        'application/msword': ['.doc'],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+        'application/vnd.ms-excel': ['.xls'],
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+        'application/vnd.ms-powerpoint': ['.ppt'],
+        'text/plain': ['.txt'],
+        'application/rtf': ['.rtf'],
+        'text/csv': ['.csv'],
         'image/png': ['.png'],
-        'image/jpeg': ['.jpeg', '.jpg']
+        'image/jpeg': ['.jpeg', '.jpg'],
+        'image/webp': ['.webp'],
+        'image/gif': ['.gif'],
+        'image/heic': ['.heic'],
       },
       multiple: Boolean(docType.maxFiles),
       maxFiles: docType.maxFiles || 1
@@ -136,7 +152,9 @@ const Step6Documents = ({ watch, setValue }) => {
             <div className="flex flex-col items-center gap-1">
               <Upload className="w-7 h-7 text-slate-400 mb-1 group-hover:scale-110 transition-transform" />
               <span className="text-xs font-bold text-slate-600">Drag & drop or browse</span>
-              <span className="text-[10px] text-slate-400">{docType.imagesOnly ? 'JPG or PNG, up to 10MB each' : 'PDF, DOCX, PNG, JPEG (Max 10MB)'}</span>
+              <span className="text-[10px] text-slate-400">
+                {docType.imagesOnly ? 'PNG, JPG, WEBP, GIF, HEIC (Max 10MB)' : 'PDF, DOCX, DOC, XLS, PPT, TXT, PNG, JPG, WEBP (Max 10MB)'}
+              </span>
             </div>
           )}
         </div>

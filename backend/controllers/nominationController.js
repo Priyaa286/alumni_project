@@ -4,7 +4,7 @@ const Setting = require('../models/Setting');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { verifySignedToken } = require('../utils/signedToken');
-const { sendNomineeApprovalEmail, sendNominationFormOpenEmail } = require('../utils/sendEmail');
+const { sendNomineeApprovalEmail, sendNominationFormOpenEmail, sendNominationUnderEvaluationEmail } = require('../utils/sendEmail');
 const memberController = require('./memberController');
 const { isServingCommitteeMember } = require('../config/committeeList');
 
@@ -201,6 +201,13 @@ exports.createNomination = async (req, res) => {
         `${appUrl.replace(/\/$/, '')}/nomination/approval/${approvalToken}`
       );
       approvalEmailSent = result.sent;
+    } else if (!isBackOffice) {
+      // Send "Your details under evaluation" email notification
+      await sendNominationUnderEvaluationEmail(
+        nomineeEmail,
+        savedNomination.nominee?.name || 'Alumnus',
+        nominationId
+      );
     }
 
     res.status(201).json({
@@ -530,20 +537,21 @@ exports.setNominationWindow = async (req, res) => {
     }
     const state = await readNominationWindow();
     
-    // Send email to priyamalarkannan666@gmail.com whenever the nomination window schedule is saved with a future closing date
+    // Send email to 24205023@nec.edu.in, 24205055@nec.edu.in, 24205035@nec.edu.in whenever the nomination window schedule is saved with a future closing date
     let emailNotice = '';
     const now = Date.now();
     const isFutureClosing = endAt.getTime() > now;
     
     if (state.isOpen || isFutureClosing) {
+      const targetRecipients = ['24205023@nec.edu.in', '24205055@nec.edu.in', '24205035@nec.edu.in'];
       const defaultFormUrl = 'https://alumni-project-adkg.vercel.app/nomination';
       const appUrl = process.env.NOMINATION_FORM_URL || (process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL.replace(/\/$/, '')}/nomination` : defaultFormUrl);
-      const emailResult = await sendNominationFormOpenEmail('priyamalarkannan666@gmail.com', appUrl);
+      const emailResult = await sendNominationFormOpenEmail(targetRecipients.join(', '), appUrl);
       if (emailResult.sent) {
-        console.log(`[NOMINATION WINDOW] Email successfully sent to priyamalarkannan666@gmail.com (Message ID: ${emailResult.messageId})`);
-        emailNotice = ' and notification email sent to priyamalarkannan666@gmail.com.';
+        console.log(`[NOMINATION WINDOW] Email successfully sent to ${targetRecipients.join(', ')} (Message ID: ${emailResult.messageId})`);
+        emailNotice = ` and notification email sent to ${targetRecipients.join(', ')}.`;
       } else {
-        console.error(`[NOMINATION WINDOW] Failed to send email to priyamalarkannan666@gmail.com: ${emailResult.reason || emailResult.error}`);
+        console.error(`[NOMINATION WINDOW] Failed to send email to ${targetRecipients.join(', ')}: ${emailResult.reason || emailResult.error}`);
         emailNotice = ` (Schedule saved, but email could not be sent: ${emailResult.reason || emailResult.error}).`;
       }
     } else {
