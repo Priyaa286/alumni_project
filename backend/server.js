@@ -11,10 +11,20 @@ const otpRoutes = require('./routes/otpRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 
+const mongoose = require('mongoose');
+
 // Initialize database connection
 connectDB();
 
 const app = express();
+
+// Middleware to ensure DB connection attempt on serverless requests
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 0) {
+    await connectDB();
+  }
+  next();
+});
 
 // Middlewares
 app.use(cors({
