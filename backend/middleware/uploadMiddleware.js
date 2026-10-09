@@ -19,26 +19,53 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter for allowed extensions
+// File filter for allowed extensions & document/image formats
 const fileFilter = (req, file, cb) => {
-  const allowedExtensions = ['.pdf', '.docx', '.png', '.jpg', '.jpeg'];
+  const allowedExtensions = [
+    // Document formats
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.rtf', '.odt', '.ods', '.odp', '.csv',
+    // Image formats
+    '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff', '.tif', '.heic', '.heif', '.svg'
+  ];
+
   const allowedMimeTypes = [
+    // PDF & Documents
     'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'text/csv',
+    'application/rtf',
+    'application/vnd.oasis.opendocument.text',
+    'application/vnd.oasis.opendocument.spreadsheet',
+    'application/vnd.oasis.opendocument.presentation',
+    // Images
     'image/png',
     'image/jpeg',
-    'image/jpg'
+    'image/pjpeg',
+    'image/jpg',
+    'image/webp',
+    'image/gif',
+    'image/bmp',
+    'image/tiff',
+    'image/heic',
+    'image/heif',
+    'image/svg+xml',
+    'application/octet-stream'
   ];
 
   const ext = path.extname(file.originalname).toLowerCase();
   const isValidExt = allowedExtensions.includes(ext);
-  const isValidMime = allowedMimeTypes.includes(file.mimetype);
+  const isValidMime = allowedMimeTypes.includes(file.mimetype) || file.mimetype.startsWith('image/');
 
   if (isValidExt && isValidMime) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF, DOCX, PNG, and JPEG/JPG are allowed.'));
+    cb(new Error(`Invalid file type (${ext || file.mimetype}). Allowed formats: PDF, DOCX, DOC, XLS, PPT, TXT, PNG, JPG, JPEG, WEBP, etc.`));
   }
 };
 

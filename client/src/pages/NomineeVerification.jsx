@@ -601,7 +601,7 @@ const NomineeVerification = () => {
                   ? viewingDoc.url 
                   : `/${viewingDoc.url}`;
 
-                if (urlLower.match(/\.(jpeg|jpg|png|gif|webp|svg)($|\?)/)) {
+                if (urlLower.match(/\.(jpeg|jpg|png|gif|webp|svg|bmp|heic|heif)($|\?)/)) {
                   return (
                     <img 
                       src={fullUrl} 

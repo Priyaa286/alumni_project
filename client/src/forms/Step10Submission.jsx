@@ -100,8 +100,8 @@ const Step10Submission = ({ isSubmitting, submittedData, onSubmit, onReset }) =>
           <div className="font-heading font-extrabold text-2xl md:text-3xl text-primary tracking-wider">
             {submittedData.nominationId || 'NOM-2026-0001'}
           </div>
-          <div className="text-[11px] text-slate-500 font-medium border-t border-slate-200/60 pt-3">
-            An acknowledgment receipt has been created. Digital notifications have been queued to the nominee & nominator contact numbers.
+          <div className="text-[12px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+            Your details are currently under evaluation. A confirmation email has been sent to your registered email address.
           </div>
         </div>
 

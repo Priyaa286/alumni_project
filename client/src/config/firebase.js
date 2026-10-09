@@ -30,4 +30,5 @@ try {
 }
 
 export const googleSignInConfigured = Boolean(auth && googleProvider);
+export const firebaseSSOConfigured = Boolean(auth && googleProvider);
 export { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword };

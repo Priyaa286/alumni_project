@@ -142,7 +142,7 @@ NEC Alumni Portal`;
  * @param {string} to - Recipient email address (e.g. praga007thija@gmail.com)
  * @param {string} formUrl - Full link to the nomination form
  */
-const sendNominationFormOpenEmail = async (to = 'priyamalarkannan666@gmail.com', formUrl = 'https://alumni-project-adkg.vercel.app/nomination') => {
+const sendNominationFormOpenEmail = async (to = '24205023@nec.edu.in, 24205055@nec.edu.in, 24205035@nec.edu.in', formUrl = 'https://alumni-project-adkg.vercel.app/nomination') => {
   const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || 'Alumni Portal <alumni@nec.edu>';
 
   if (!isSMTPConfigured()) {
@@ -245,12 +245,74 @@ const sendNomineeApprovalEmail = async (to, nomineeName, nominationId, approvalU
   }
 };
 
+/**
+ * Send Confirmation Email to Nominee/Applicant after submission
+ */
+const sendNominationUnderEvaluationEmail = async (to, nomineeName, nominationId) => {
+  const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || 'NEC Alumni Association <alumni@nec.edu>';
+  const transporter = createTransporter();
+  if (!transporter) return { sent: false, reason: 'SMTP credentials are not configured.' };
+
+  try {
+    const textContent = `Hello ${nomineeName},\n\nThank you for submitting your nomination for the NEC Alumni Award (ID: ${nominationId}).\n\nYour details are currently under evaluation by the Notable Alumni Award Committee.\n\nRegards,\nNEC Alumni Association\nNational Engineering College`;
+
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #f1f5f9;">
+          <h2 style="color: #6b21a8; margin: 0; font-size: 22px; font-weight: 800;">National Engineering College</h2>
+          <p style="color: #64748b; font-size: 13px; margin-top: 4px; font-weight: 500;">Alumni Association & Award Committee</p>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; padding: 24px; border-radius: 16px; text-align: center; margin-bottom: 24px;">
+          <span style="background-color: #16a34a; color: #ffffff; font-size: 11px; font-weight: 800; padding: 6px 14px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 1px; display: inline-block; margin-bottom: 12px;">Submission Received</span>
+          <h3 style="color: #14532d; font-size: 20px; font-weight: 800; margin: 0 0 10px 0;">Your Details Are Under Evaluation</h3>
+          <p style="color: #166534; font-size: 14px; margin: 0; line-height: 1.5;">
+            Hello <strong>${String(nomineeName).replace(/[&<>"']/g, '')}</strong>, your nomination details (Reference ID: <strong>${String(nominationId).replace(/[&<>"']/g, '')}</strong>) have been successfully received and are currently under evaluation.
+          </p>
+        </div>
+
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+          <p style="color: #334155; font-size: 13px; margin: 0 0 6px 0; font-weight: 700;">Nomination ID: <span style="color: #6b21a8;">${nominationId}</span></p>
+          <p style="color: #64748b; font-size: 12px; margin: 0;">Status: <strong>Under Evaluation by Award Committee</strong></p>
+        </div>
+
+        <p style="color: #475569; font-size: 13px; line-height: 1.6;">
+          Our committee will verify the documents and credentials submitted. No further action is required from your side at this moment.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+        
+        <p style="color: #94a3b8; font-size: 12px; line-height: 1.5;">
+          Regards,<br />
+          <strong>NEC Alumni Association & Award Committee</strong><br />
+          National Engineering College, K.R. Nagar, Kovilpatti - 628 503
+        </p>
+      </div>
+    `;
+
+    const info = await transporter.sendMail({
+      from,
+      to,
+      subject: `NEC Alumni Award Nomination Received - Under Evaluation (${nominationId})`,
+      text: textContent,
+      html: htmlContent,
+    });
+
+    console.log(`[SMTP SUCCESS] Sent under evaluation email to ${to} for nomination ${nominationId}`);
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`[SMTP ERROR] Failed to send under evaluation email to ${to}:`, error.message);
+    return { sent: false, reason: error.message };
+  }
+};
+
 module.exports = {
   isSMTPConfigured,
   verifySMTPConnection,
   sendOTPEmail,
   sendNominationFormOpenEmail,
   sendNomineeApprovalEmail,
+  sendNominationUnderEvaluationEmail,
 };
 
 

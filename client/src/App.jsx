@@ -39,8 +39,15 @@ function AppContent() {
           <Route path="/nomination" element={<NominationForm />} />
           <Route path="/nomination/approval/:token" element={<NomineeApproval />} />
 
-          {/* Public Leaderboard Route */}
-          <Route path="/leaderboard" element={<Leaderboard />} />
+          {/* Admin-only Leaderboard Route */}
+          <Route
+            path="/leaderboard"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Leaderboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Admin Login Routes */}
           <Route path="/login" element={<Login />} />

@@ -25,8 +25,8 @@ const UserSchema = new mongoose.Schema(
     },
     authProvider: {
       type: String,
-      enum: ['local', 'google', 'email_otp'],
-      default: 'local',
+      enum: ['local', 'google', 'email_otp', 'firebase_sso', 'firebase', 'local-development'],
+      default: 'firebase_sso',
     },
     avatarUrl: {
       type: String,

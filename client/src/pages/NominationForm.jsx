@@ -400,12 +400,6 @@ const NominationForm = ({ backOffice = false }) => {
               <RotateCcw className="w-4 h-4" />
               <span>Refresh Status</span>
             </button>
-            <Link
-              to="/leaderboard"
-              className="px-6 py-3 rounded-2xl bg-primary text-white font-bold text-xs hover:bg-primary/90 transition-all shadow-md flex items-center gap-2"
-            >
-              <span>View Leaderboard</span>
-            </Link>
           </div>
         </div>
       </div>

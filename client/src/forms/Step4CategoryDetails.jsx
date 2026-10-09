@@ -688,7 +688,7 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
           <div className="relative border-2 border-dashed border-slate-300 hover:border-primary rounded-nec p-4 text-center cursor-pointer transition-all bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center min-h-[120px]">
             <input
               type="file"
-              accept=".pdf,.docx,.png,.jpg,.jpeg"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,.png,.jpg,.jpeg,.webp,.gif,.bmp,.heic,.heif,.svg"
               onChange={(e) => handleCategoryFileUpload(e, 'serviceBook')}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               disabled={uploadingField === 'serviceBook'}
@@ -707,7 +707,7 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
               <div className="flex flex-col items-center gap-2 text-slate-500">
                 <Upload className="w-8 h-8 text-slate-400" />
                 <span className="text-xs font-semibold">Upload Service Book</span>
-                <span className="text-[10px] text-slate-400">PDF, DOCX, PNG, JPEG up to 10MB</span>
+                <span className="text-[10px] text-slate-400">PDF, DOCX, DOC, XLS, PPT, TXT, PNG, JPG, WEBP up to 10MB</span>
               </div>
             )}
           </div>
@@ -729,7 +729,7 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
           <div className="relative border-2 border-dashed border-slate-300 hover:border-primary rounded-nec p-4 text-center cursor-pointer transition-all bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center min-h-[120px]">
             <input
               type="file"
-              accept=".pdf,.docx,.png,.jpg,.jpeg"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,.png,.jpg,.jpeg,.webp,.gif,.bmp,.heic,.heif,.svg"
               onChange={(e) => handleCategoryFileUpload(e, 'exServiceId')}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               disabled={uploadingField === 'exServiceId'}
@@ -748,7 +748,7 @@ const Step4CategoryDetails = ({ register, formState: { errors }, watch, setValue
               <div className="flex flex-col items-center gap-2 text-slate-500">
                 <Upload className="w-8 h-8 text-slate-400" />
                 <span className="text-xs font-semibold">Upload ID Card Copy</span>
-                <span className="text-[10px] text-slate-400">PDF, DOCX, PNG, JPEG up to 10MB</span>
+                <span className="text-[10px] text-slate-400">PDF, DOCX, DOC, XLS, PPT, TXT, PNG, JPG, WEBP up to 10MB</span>
               </div>
             )}
           </div>

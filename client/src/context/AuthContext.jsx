@@ -123,31 +123,60 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Google Sign-In (Passwordless)
+   * Production Single Sign-On (SSO) using Firebase Auth
    */
-  const loginWithGoogle = async () => {
+  const loginWithFirebaseSSO = async () => {
     setLoading(true);
 
     try {
       if (!auth || !googleProvider) {
-        return { success: false, message: 'Google sign-in is not configured. Please use email OTP.' };
+        return {
+          success: false,
+          message: 'Firebase SSO is not configured. Please ensure VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID are set in client/.env.',
+        };
       }
+
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
       const idToken = await firebaseUser.getIdToken();
-      const response = await googleAuthApi({ idToken });
+      const response = await googleAuthApi({
+        idToken,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName,
+        photoURL: firebaseUser.photoURL,
+      });
+
       if (!response.success || !response.user || !response.token) {
-        return { success: false, message: response.message || 'Google sign-in could not be verified.' };
+        return { success: false, message: response.message || 'Firebase Single Sign-On verification failed.' };
       }
+
+      if (response.user.role !== 'admin') {
+        return {
+          success: false,
+          isAdminDenied: true,
+          message: 'You do not have administrative access. Alumni can fill out and submit nominations directly without logging in.',
+          user: response.user,
+        };
+      }
+
       saveAuthSession(response.user, response.token);
       return { success: true, user: response.user };
     } catch (err) {
-      console.error('Google login error:', err);
-      return { success: false, message: err.response?.data?.message || err.message || 'Google Sign-In encountered an issue.' };
+      console.error('Firebase SSO login error:', err);
+      // Handle popup closed by user gracefully
+      if (err.code === 'auth/popup-closed-by-user') {
+        return { success: false, message: 'Sign-in popup was closed before completing SSO.' };
+      }
+      return {
+        success: false,
+        message: err.response?.data?.message || err.message || 'Firebase Single Sign-On encountered an issue.',
+      };
     } finally {
       setLoading(false);
     }
   };
+
+  const loginWithGoogle = loginWithFirebaseSSO;
 
   const loginLocally = async (email) => {
     setLoading(true);
@@ -186,6 +215,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         requestOtp,
         verifyOtpCode,
+        loginWithFirebaseSSO,
         loginWithGoogle,
         loginLocally,
         logout,
