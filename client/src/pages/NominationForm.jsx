@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
@@ -399,12 +400,12 @@ const NominationForm = ({ backOffice = false }) => {
               <RotateCcw className="w-4 h-4" />
               <span>Refresh Status</span>
             </button>
-            <a
-              href="/leaderboard"
+            <Link
+              to="/leaderboard"
               className="px-6 py-3 rounded-2xl bg-primary text-white font-bold text-xs hover:bg-primary/90 transition-all shadow-md flex items-center gap-2"
             >
               <span>View Leaderboard</span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>

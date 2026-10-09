@@ -17,7 +17,7 @@ const readNominationWindow = async () => {
     ? await Setting.findOne({ key: 'nominationWindow' }).lean()
     : null;
   const window = setting?.value || null;
-  if (!window?.startAt || !window?.endAt) return { isOpen: false, startAt: null, endAt: null };
+  if (!window?.startAt || !window?.endAt) return { isOpen: true, startAt: null, endAt: null };
   const now = Date.now();
   const startAt = new Date(window.startAt).getTime();
   const endAt = new Date(window.endAt).getTime();
@@ -556,11 +556,15 @@ exports.setNominationWindow = async (req, res) => {
 exports.getLeaderboard = async (req, res) => {
   try {
     const data = mongoose.connection.readyState === 1
-      ? await Nomination.find({ awardResult: 'Winner' }).sort({ awardYear: -1, createdAt: -1 }).lean()
-      : Array.from(new Set(inMemoryNominations.values())).filter((item) => item.awardResult === 'Winner');
+      ? await Nomination.find({
+          $or: [{ awardResult: 'Winner' }, { verificationStatus: 'Approved' }]
+        }).sort({ awardYear: -1, createdAt: -1 }).lean()
+      : Array.from(new Set(inMemoryNominations.values())).filter(
+          (item) => item.awardResult === 'Winner' || item.verificationStatus === 'Approved'
+        );
     return res.status(200).json({ success: true, data });
-  } catch {
-    return res.status(500).json({ success: false, message: 'Could not load award winners.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Could not load leaderboard data.' });
   }
 };
 
