@@ -536,7 +536,8 @@ exports.setNominationWindow = async (req, res) => {
     const isFutureClosing = endAt.getTime() > now;
     
     if (state.isOpen || isFutureClosing) {
-      const appUrl = process.env.APP_BASE_URL || process.env.NOMINATION_FORM_URL || 'http://localhost:3000/nomination';
+      const defaultFormUrl = 'https://alumni-project-adkg.vercel.app/nomination';
+      const appUrl = process.env.NOMINATION_FORM_URL || (process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL.replace(/\/$/, '')}/nomination` : defaultFormUrl);
       const emailResult = await sendNominationFormOpenEmail('priyamalarkannan666@gmail.com', appUrl);
       if (emailResult.sent) {
         console.log(`[NOMINATION WINDOW] Email successfully sent to priyamalarkannan666@gmail.com (Message ID: ${emailResult.messageId})`);
