@@ -4,7 +4,7 @@ const nominationController = require('../controllers/nominationController');
 const { authenticate, verifyAdmin } = require('../middleware/authMiddleware');
 
 // Nomination Form Routes
-router.post('/nominations', authenticate, nominationController.createNomination);
+router.post('/nominations', nominationController.createNomination);
 router.get('/nominations/:id', verifyAdmin, nominationController.getNominationById);
 router.put('/nominations/:id', verifyAdmin, nominationController.updateNomination);
 router.delete('/nominations/:id', verifyAdmin, nominationController.deleteNomination);

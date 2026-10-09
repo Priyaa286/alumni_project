@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, FileText, Trophy } from 'lucide-react';
+import { LogOut, LayoutDashboard, FileText, LogIn, Trophy } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,7 +12,6 @@ const Header = () => {
   // Check authentication & admin status
   const isLoggedIn = Boolean(isAuthenticated && user);
   const isAdmin = isLoggedIn && user?.role === 'admin';
-  const isFormPage = ['/nomination', '/admin/create-nomination'].includes(location.pathname);
 
   const handleLogout = () => {
     logout();
@@ -20,12 +19,19 @@ const Header = () => {
     navigate('/login');
   };
 
+  const isActive = (path) => {
+    if (path === '/nomination') {
+      return location.pathname === '/' || location.pathname === '/nomination';
+    }
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <header className="w-full glass-panel sticky top-0 z-50 py-3 shadow-premium border-b border-borderlight bg-white/95 backdrop-blur-md">
       <div className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-10 flex flex-col md:flex-row items-center justify-between gap-4">
         
         {/* Left: National Engineering College Logo */}
-        <div className="flex items-center gap-3">
+        <Link to={isAdmin ? "/admin/responses" : "/nomination"} className="flex items-center gap-3">
           <div className="relative flex items-center justify-center p-1 bg-white/80 rounded-xl shadow-sm border border-primary/10">
             <img
               src="/nec-logo.png"
@@ -41,40 +47,48 @@ const Header = () => {
               K.R. Nagar, Kovilpatti - 628 503
             </p>
           </div>
-        </div>
+        </Link>
 
-        {/* Center: Admin Navigations OR Portal Span Banner */}
+        {/* Center: Admin Navigations OR Portal Span Banner before login */}
         <div className="text-center">
           {isAdmin ? (
-            <div className="flex items-center gap-3">
-              {/* Leaderboard Navigation */}
+            <nav className="flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/80 shadow-inner">
               <Link
-                to="/leaderboard"
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300 transition-colors shadow-sm"
+                to="/admin/responses"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 ${
+                  isActive('/admin')
+                    ? 'bg-purple-900 text-white shadow-md scale-105'
+                    : 'text-purple-700 hover:bg-purple-100/80'
+                }`}
               >
-                <Trophy className="w-4 h-4 text-amber-600" />
-                <span>Leaderboard</span>
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Admin Dashboard</span>
               </Link>
 
-              {/* Admin Dashboard / Nomination Form Navigation */}
-              {location.pathname === '/admin/responses' ? (
-                <Link
-                  to="/nomination"
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-primary text-xs font-bold border border-primary/20 transition-colors"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>Nomination Form</span>
-                </Link>
-              ) : (
-                <Link
-                  to="/admin/responses"
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-primary text-xs font-bold border border-primary/20 transition-colors"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  <span>Admin Dashboard</span>
-                </Link>
-              )}
-            </div>
+              <Link
+                to="/nomination"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 ${
+                  isActive('/nomination')
+                    ? 'bg-primary text-white shadow-md scale-105'
+                    : 'text-slate-600 hover:text-primary hover:bg-white/80'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Nomination Form</span>
+              </Link>
+
+              <Link
+                to="/leaderboard"
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 ${
+                  isActive('/leaderboard')
+                    ? 'bg-primary text-white shadow-md scale-105'
+                    : 'text-slate-600 hover:text-primary hover:bg-white/80'
+                }`}
+              >
+                <Trophy className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <span>Leaderboard</span>
+              </Link>
+            </nav>
           ) : (
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 shadow-sm">
               <span className="text-xs md:text-sm font-bold text-primary tracking-widest uppercase font-heading">
@@ -84,7 +98,7 @@ const Header = () => {
           )}
         </div>
 
-        {/* Right: Alumni Association Logo */}
+        {/* Right: Alumni Association Logo & Auth Options */}
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center p-1 bg-white/80 rounded-xl shadow-sm border border-primary/10">
             <img
@@ -94,16 +108,32 @@ const Header = () => {
             />
           </div>
 
-          {/* Logout button displayed for logged in admin */}
-          {isAdmin && (
-            <button
-              onClick={handleLogout}
-              title="Logout"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition-colors cursor-pointer shadow-sm"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+          {/* User Auth Action (Logout if logged in, Login button if not) */}
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex flex-col text-right">
+                <span className="text-xs font-bold text-slate-800 truncate max-w-[120px]">{user?.name || user?.email}</span>
+                <span className="text-[10px] uppercase font-extrabold text-primary tracking-wider">{user?.role}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Logout"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold border border-rose-200 transition-colors cursor-pointer shadow-sm"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          ) : (
+            location.pathname !== '/login' && (
+              <Link
+                to="/login"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-purple-700 hover:from-primary/90 hover:to-purple-800 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Admin Login</span>
+              </Link>
+            )
           )}
         </div>
         
