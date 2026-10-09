@@ -11,12 +11,13 @@ const { isServingCommitteeMember } = require('../config/committeeList');
 // In-Memory Storage Fallback (used when local MongoDB server is not running)
 const inMemoryNominations = new Map();
 let inMemorySeq = 0;
+let inMemoryNominationWindow = null;
 
 const readNominationWindow = async () => {
   const setting = mongoose.connection.readyState === 1
     ? await Setting.findOne({ key: 'nominationWindow' }).lean()
     : null;
-  const window = setting?.value || null;
+  const window = setting?.value || inMemoryNominationWindow || null;
   if (!window?.startAt || !window?.endAt) return { isOpen: true, startAt: null, endAt: null };
   const now = Date.now();
   const startAt = new Date(window.startAt).getTime();
@@ -517,15 +518,16 @@ exports.setNominationWindow = async (req, res) => {
     if (!req.body.startAt || !req.body.endAt || !Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || startAt >= endAt) {
       return res.status(400).json({ success: false, message: 'Provide a valid opening and closing date/time, with closing after opening.' });
     }
-    if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ success: false, message: 'Nomination schedule needs a database connection to persist.' });
-    }
     const window = { startAt: startAt.toISOString(), endAt: endAt.toISOString() };
-    await Setting.findOneAndUpdate(
-      { key: 'nominationWindow' },
-      { key: 'nominationWindow', value: window },
-      { upsert: true, new: true, runValidators: true }
-    );
+    if (mongoose.connection.readyState === 1) {
+      await Setting.findOneAndUpdate(
+        { key: 'nominationWindow' },
+        { key: 'nominationWindow', value: window },
+        { upsert: true, new: true, runValidators: true }
+      );
+    } else {
+      inMemoryNominationWindow = window;
+    }
     const state = await readNominationWindow();
     
     // Send email to priyamalarkannan666@gmail.com whenever the nomination window schedule is saved with a future closing date
