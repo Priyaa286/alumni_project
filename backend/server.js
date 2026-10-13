@@ -35,7 +35,9 @@ app.use(cors({
 app.use(express.json({ limit: '15mb' })); // Support larger JSON payloads (signature canvas and text data)
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Static route to serve uploaded files (previews & downloads)
+// Route to serve uploaded files (GridFS with local storage fallback)
+const uploadController = require('./controllers/uploadController');
+app.get('/uploads/:filename', uploadController.getFile);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
