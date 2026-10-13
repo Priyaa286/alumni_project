@@ -6,4 +6,7 @@ const uploadController = require('../controllers/uploadController');
 // Upload single file endpoint
 router.post('/upload', uploadMiddleware.single('file'), uploadController.uploadFile);
 
+// Serve uploaded files
+router.get('/uploads/:filename', uploadController.getFile);
+
 module.exports = router;
