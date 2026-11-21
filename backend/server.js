@@ -47,6 +47,13 @@ app.use('/api/otp', otpRoutes);
 app.use('/api', memberRoutes);
 app.use('/api', uploadRoutes);
 
+// Single Sign-On (Vaave SSO SDK) Routes
+const notableAlumniSSORoutes = require('./single-sign-on/routes/notableAlumni');
+app.use('/notable-alumni', notableAlumniSSORoutes);
+app.use('/api/notable-alumni', notableAlumniSSORoutes);
+app.use('/api', notableAlumniSSORoutes);
+app.use('/', notableAlumniSSORoutes);
+
 // Root route placeholder
 app.get('/', (req, res) => {
   res.send('NEC Alumni Award Nomination Portal API is running...');

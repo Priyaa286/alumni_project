@@ -98,6 +98,27 @@ const NominationForm = ({ backOffice = false }) => {
     checkFormStatus();
   }, []);
 
+  // Handle Vaave Single Sign-On (SSO) email parameter in URL (?email=base64Email)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailFromUrl = params.get('email');
+    if (emailFromUrl) {
+      try {
+        const decodedEmail = atob(emailFromUrl);
+        if (decodedEmail && decodedEmail.includes('@')) {
+          const cleanEmail = decodedEmail.trim().toLowerCase();
+          setValue('nominee.email', cleanEmail, { shouldValidate: true });
+          setValue('nominationType', 'self', { shouldValidate: true });
+          toast.success(`Signed in via SSO as ${cleanEmail}`);
+        }
+      } catch (err) {
+        console.warn('SSO email decoding warning:', err.message);
+      }
+      // Clean up URL query parameters without reloading the page
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [setValue]);
+
   // Load saved draft values from local storage, or fallback to empty structure
 
   const [defaultValues] = useState(() => {

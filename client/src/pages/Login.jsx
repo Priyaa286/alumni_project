@@ -13,8 +13,15 @@ const Login = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect if user is already authenticated
+  // Redirect if user is already authenticated or handle SSO query param
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailFromUrl = params.get('email');
+    if (emailFromUrl) {
+      navigate(`/nomination?email=${encodeURIComponent(emailFromUrl)}`, { replace: true });
+      return;
+    }
+
     if (isAuthenticated && user) {
       if (user.role === 'admin') {
         navigate('/admin/responses', { replace: true });
