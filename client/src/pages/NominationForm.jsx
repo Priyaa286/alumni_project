@@ -98,6 +98,25 @@ const NominationForm = ({ backOffice = false }) => {
     checkFormStatus();
   }, []);
 
+  // Load saved draft values from local storage, or fallback to empty structure
+  const [defaultValues] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return JSON.parse(saved);
+      return backOffice ? { ...EMPTY_FORM_VALUES, nominationType: 'others' } : EMPTY_FORM_VALUES;
+    } catch (e) {
+      return EMPTY_FORM_VALUES;
+    }
+  });
+
+  const { register, control, watch, setValue, trigger, formState, reset } = useForm({
+    defaultValues,
+    mode: 'onChange'
+  });
+
+  const { errors } = formState;
+  const formValues = watch();
+
   // Handle Vaave Single Sign-On (SSO) email parameter in URL (?email=base64Email)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -118,26 +137,6 @@ const NominationForm = ({ backOffice = false }) => {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [setValue]);
-
-  // Load saved draft values from local storage, or fallback to empty structure
-
-  const [defaultValues] = useState(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) return JSON.parse(saved);
-      return backOffice ? { ...EMPTY_FORM_VALUES, nominationType: 'others' } : EMPTY_FORM_VALUES;
-    } catch (e) {
-      return EMPTY_FORM_VALUES;
-    }
-  });
-
-  const { register, control, watch, setValue, trigger, formState, reset } = useForm({
-    defaultValues,
-    mode: 'onChange'
-  });
-
-  const { errors } = formState;
-  const formValues = watch();
 
   const nominationType = watch('nominationType') || 'self';
 
