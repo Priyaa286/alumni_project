@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { sendOTP as sendOtpApi, verifyOTP as verifyOtpApi, googleAuthUser as googleAuthApi, localDevLogin as localDevLoginApi } from '../services/api';
+import { googleAuthUser as googleAuthApi, localDevLogin as localDevLoginApi } from '../services/api';
 import { auth, googleProvider, signInWithPopup } from '../config/firebase';
 
 const AuthContext = createContext(null);
@@ -69,57 +69,6 @@ export const AuthProvider = ({ children }) => {
     };
     setAuthState(newState);
     localStorage.setItem('auth_user', JSON.stringify(newState));
-  };
-
-  /**
-   * Request 6-Digit Email OTP
-   */
-  const requestOtp = async (email) => {
-    setLoading(true);
-    const cleanEmail = email.trim().toLowerCase();
-
-    try {
-      const res = await sendOtpApi(cleanEmail);
-      return res;
-    } catch (err) {
-      console.warn('Backend send OTP error:', err);
-      const msg = err.response?.data?.message || 'Failed to send verification code. Please make sure the backend server is running.';
-      return {
-        success: false,
-        message: msg,
-      };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Verify 6-Digit Email OTP Code
-   */
-  const verifyOtpCode = async (email, otpCode) => {
-    setLoading(true);
-    const cleanEmail = email.trim().toLowerCase();
-    const inputOtp = otpCode.trim();
-
-    try {
-      const res = await verifyOtpApi(cleanEmail, inputOtp);
-      if (res.success) {
-        const userObj = res.user || {
-          name: cleanEmail.split('@')[0],
-          email: cleanEmail,
-          role: 'user',
-        };
-        saveAuthSession(userObj, res.token);
-        return { success: true, user: userObj };
-      } else {
-        return { success: false, message: res.message || 'Verification failed.' };
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid or expired verification code.';
-      return { success: false, message: msg };
-    } finally {
-      setLoading(false);
-    }
   };
 
   /**
@@ -213,8 +162,6 @@ export const AuthProvider = ({ children }) => {
         user: authState.user,
         token: authState.token,
         loading,
-        requestOtp,
-        verifyOtpCode,
         loginWithFirebaseSSO,
         loginWithGoogle,
         loginLocally,

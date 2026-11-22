@@ -24,16 +24,6 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
-export const sendOTP = async (email) => {
-  const response = await API.post('/api/auth/send-otp', { email });
-  return response.data;
-};
-
-export const verifyOTP = async (email, otp) => {
-  const response = await API.post('/api/auth/verify-otp', { email, otp });
-  return response.data;
-};
-
 export const googleAuthUser = async (googleData) => {
   const response = await API.post('/api/auth/google', googleData);
   return response.data;
@@ -92,16 +82,6 @@ export const lookupMemberByEmail = async (email) => {
   return response.data;
 };
 
-export const sendOtp = async (email) => {
-  const response = await API.post('/api/otp/send-otp', { email });
-  return response.data;
-};
-
-export const verifyOtp = async (email, otp) => {
-  const response = await API.post('/api/otp/verify-otp', { email, otp });
-  return response.data;
-};
-
 export const verifyNomination = async (id, data) => {
   const response = await API.put(`/api/admin/nominations/${id}/verify`, data);
   return response.data;
@@ -148,8 +128,6 @@ export const getNominationStatus = async () => {
 };
 
 export default {
-  sendOTP,
-  verifyOTP,
   googleAuthUser,
   getAllNominations,
   createAdminNomination,
@@ -159,8 +137,6 @@ export default {
   getCategories,
   uploadFile,
   lookupMemberByEmail,
-  sendOtp,
-  verifyOtp,
   verifyNomination,
   setAwardResult,
   resendNomineeApproval,

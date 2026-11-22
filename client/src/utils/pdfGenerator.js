@@ -124,12 +124,9 @@ export const generateAcknowledgementPDF = (data) => {
   }
 
   // Declaration Section
-  drawSectionHeader('5. Declaration & Email OTP Verification');
+  drawSectionHeader('5. Declaration & Signature');
   drawRow('Signee Name:', declaration.nomineeName, 'Place:', declaration.place);
-  drawRow('Declaration Date:', declaration.date || new Date().toLocaleDateString(), '', '');
-  
-  y += 5;
-  drawRow('Email Verification:', declaration.isOtpVerified ? 'Verified via Nominee Email' : 'Pending', 'Nominee Email:', nominee.email || 'N/A');
+  drawRow('Declaration Date:', declaration.date || new Date().toLocaleDateString(), 'Nominee Email:', nominee.email || 'N/A');
 
   // Footer Branding Note
   doc.setFontSize(8);

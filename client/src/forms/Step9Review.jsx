@@ -240,24 +240,10 @@ const Step9Review = ({ watch, onEditStep }) => {
       </ReviewSection>
 
       {/* Step 8: Declaration */}
-      <ReviewSection title="8. Declaration & Email OTP Verification" stepId="declaration">
+      <ReviewSection title="8. Declaration & Signature" stepId="declaration">
         <DataItem label="Signee Name" value={declaration.nomineeName} />
         <DataItem label="Signing Place" value={declaration.place} />
         <DataItem label="Signing Date" value={declaration.date} />
-        <div className="md:col-span-2">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-            Email Verification Status
-          </span>
-          {declaration.isOtpVerified ? (
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-100 text-emerald-800 text-xs font-extrabold rounded-full border border-emerald-300">
-              Verified via Nominee Email ({nominee.email || 'N/A'})
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-100 text-rose-800 text-xs font-extrabold rounded-full border border-rose-300">
-              OTP Verification Pending
-            </span>
-          )}
-        </div>
       </ReviewSection>
     </div>
   );

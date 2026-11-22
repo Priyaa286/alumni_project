@@ -138,9 +138,6 @@ exports.createNomination = async (req, res) => {
     const nominationData = { ...req.body };
     if (nominationData.declaration) {
       nominationData.declaration = { ...nominationData.declaration };
-      delete nominationData.declaration.verificationToken;
-      delete nominationData.declaration.verifiedEmail;
-      delete nominationData.declaration.isOtpVerified;
     }
     nominationData.nominee.email = nomineeEmail;
     nominationData.createdBy = isBackOffice ? 'back-office' : 'applicant';

@@ -69,8 +69,7 @@ const EMPTY_FORM_VALUES = {
     nomineeName: '',
     date: '',
     place: '',
-    signature: '',
-    isOtpVerified: false
+    signature: ''
   }
 };
 
@@ -179,7 +178,7 @@ const NominationForm = ({ backOffice = false }) => {
       component: Step8Declaration, 
       fields: [
         'declaration.isDeclared', 'declaration.nomineeName', 
-        'declaration.date', 'declaration.place', 'declaration.signature', ...(backOffice ? [] : ['declaration.isOtpVerified'])
+        'declaration.date', 'declaration.place', 'declaration.signature'
       ] 
     });
     list.push({ id: 'review', label: 'Review', component: Step9Review, fields: [] });
@@ -308,7 +307,7 @@ const NominationForm = ({ backOffice = false }) => {
         );
       case 'declaration':
         const decl = formValues.declaration || {};
-        return decl.isDeclared && decl.nomineeName && decl.date && decl.place && decl.signature && (backOffice || decl.isOtpVerified);
+        return decl.isDeclared && decl.nomineeName && decl.date && decl.place && decl.signature;
       case 'review':
       case 'submit':
         return true;
